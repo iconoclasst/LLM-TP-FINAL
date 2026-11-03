@@ -1,12 +1,23 @@
+"""
+Remove PII de dataset jsonl (formato messages) com Presidio.
+Troca por etiqueta: "Sarah" -> "<PERSON>".
+ 
+Install:
+    pip install presidio-analyzer presidio-anonymizer spacy
+    python -m spacy download en_core_web_lg
+ 
+Uso:
+    python remove_pii.py dataset_degraded_ft.jsonl dataset_degraded_ft_nopii.jsonl
+"""
+
 import json
 import sys
 from collections import Counter
+import os
 
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 
-# Quais entidades remover. DATE_TIME fora de proposito
-# ("Saturday at 7 PM" nao e PII forte). Mude se quiser.
 ENTITIES = [
     "PERSON",
     "EMAIL_ADDRESS",
@@ -18,10 +29,10 @@ ENTITIES = [
     "URL",
     "US_SSN",
 ]
-MIN_SCORE = 0.4  # confianca minima do detector
+MIN_SCORE = 0.4
 
-analyzer = AnalyzerEngine()  # usa en_core_web_lg
-anonymizer = AnonymizerEngine()  # default: troca por <ENTITY_TYPE>
+analyzer = AnalyzerEngine()
+anonymizer = AnonymizerEngine()
 
 
 def scrub(text, stats):
@@ -61,12 +72,28 @@ def main(path_in, path_out):
             n_changed += changed
             fout.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    print(f"linhas total:   {n_lines}")
-    print(f"linhas mudadas: {n_changed} ({100 * n_changed / max(n_lines, 1):.1f}%)")
-    print("entidades achadas:")
-    for k, v in stats.most_common():
-        print(f"  {k}: {v}")
+    report = [
+        f"Arquivo de entrada: {path_in}",
+        f"Arquivo de saída:   {path_out}",
+        f"linhas total:   {n_lines}",
+        f"linhas mudadas: {n_changed} "
+        f"({100 * n_changed / max(n_lines, 1):.1f}%)",
+        "entidades achadas:",
+    ]
 
+    for k, v in stats.most_common():
+        report.append(f"  {k}: {v}")
+
+    report_text = "\n".join(report) + "\n"
+
+    log_path = "data/pii_removal/logs.txt"
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+    with open(log_path, "w", encoding="utf-8") as log_file:
+        log_file.write(report_text)
+
+    print(report_text, end="")
+    print(f"\nRelatório salvo em: {log_path}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
