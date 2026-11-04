@@ -1,6 +1,6 @@
 # Controlador único de reprodução: design
 
-Status: aguardando aprovação. Branch: `feature/controlador-reproducao`.
+Status: aprovado em 03/11/2026, com os ajustes do usuário (aviso antes de executar; trabalho incompleto do Davi ignorado). Branch: `feature/controlador-reproducao`.
 
 ## 1. Intenção
 
@@ -15,7 +15,7 @@ especificação exige comandos exatos, versões fixadas e saídas salvas.
 - `python3 reproduce.py` faz tudo: prepara ambiente, baixa insumos, roda, compara e gera o relatório.
 - Usa GPU se houver (CUDA, depois MPS); senão, CPU.
 - Pode ser interrompido e retomado sem perder o que já terminou.
-- Avisa antes de começar o que está faltando, em vez de falhar horas depois.
+- **Antes de executar qualquer etapa pesada**, verifica o computador e mostra ao usuário os requisitos e empecilhos (seção 6.1). O usuário confirma para continuar.
 - `docs/PIPELINE.md` explica o pipeline e traz estimativas de tempo.
 
 **Não objetivos**
@@ -53,8 +53,7 @@ Vereditos: `OK`, `FORA_DA_TOLERANCIA`, `SEM_BASELINE`, `NAO_EXECUTADO`. Nenhum r
 | `gustavo` | Pares DPO, 2 treinos DPO, 3 condições ICL, avaliação com juiz (`LIMIT=None`) | `summary.csv`, quando chegar |
 
 Fica de fora, por não ter resultado preliminar: `role_swap_ft` v1, run `teste`, `cand_*`,
-`_q15__base_v1_sem_schema`, `privacy_refine.py` e juiz/CIMemories do Davi. Estes dois últimos poderão ser ligados por
-`--extend`, marcados como `SEM_BASELINE`.
+`_q15__base_v1_sem_schema`, `privacy_refine.py` e juiz/CIMemories do Davi. O trabalho incompleto do Davi é ignorado por decisão do usuário.
 
 ## 5. Interface
 
@@ -65,18 +64,29 @@ python3 reproduce.py --only rk        # um bloco: rk, davi ou gustavo
 python3 reproduce.py --smoke          # poucos itens e passos, para testar o pipeline; nunca compara com baseline
 python3 reproduce.py --report-only    # só refaz comparação e relatório
 python3 reproduce.py --fresh          # ignora o que já foi concluído
-python3 reproduce.py --extend         # inclui juiz e CIMemories do Davi
+python3 reproduce.py --yes            # não pede confirmação (para rodar sem supervisão)
 ```
 
 ## 6. Etapas do controlador
 
 1. **Bootstrap.** O script usa só a biblioteca padrão, acha ou cria um Python 3.12 (`python3.12`, `uv` ou `conda`), monta os ambientes virtuais e se reexecuta dentro deles.
-2. **Preflight.** Dispositivo, disco, Ollama, insumos e versões. Termina com a lista do que falta e como obter.
+2. **Aviso antes de executar.** Ver seção 6.1. Roda sempre, em toda execução que não seja `--report-only`.
 3. **Download.** Drive e Hugging Face, com verificação de hash.
 4. **Execução.** Blocos em sequência (`rk`, `davi`, `gustavo`), um processo por etapa, com GPU liberada entre etapas. Cada etapa só conta como concluída com saída válida e é registrada em `ledger.jsonl`.
 5. **Comparação e relatório.** Gera os artefatos da seção 8.
 
 Se uma etapa falhar, o bloco é interrompido, os demais continuam e o relatório mostra a falha. O código de saída fica diferente de zero.
+
+### 6.1 Aviso antes de executar
+
+Antes de instalar ou baixar algo grande, o controlador mostra um relatório do computador e pede confirmação:
+
+- **Bloqueios** (impedem o bloco): falta Python 3.12 obtenível, falta Ollama para o Gustavo, disco insuficiente, Drive ou Hugging Face inacessíveis.
+- **Avisos** (permitem continuar): sem CUDA, com aviso de que resultados em MPS/CPU têm desvios e de que o caminho CUDA não foi testado no Mac; quantização em 4 bits indisponível; pouca memória; arquivos do Gustavo ausentes, com `SEM_BASELINE`.
+- **Para cada problema:** o que acontece e como resolver, com o comando quando houver.
+- **Plano:** blocos que rodarão ou serão pulados, tempo estimado por bloco para a máquina atual e espaço em disco necessário contra o disponível.
+
+Sem `--yes`, pergunta `Continuar? [s/N]`; a resposta padrão é não. Sem terminal interativo e sem `--yes`, não executa. `--check` mostra o relatório e sai sem executar nada. Com um bloqueio, oferece rodar os demais blocos.
 
 ## 7. Alterações em código e arquivos
 
@@ -124,7 +134,7 @@ outputs/rk/ davi/ gustavo/   resultados completos de cada experimento
 | Qwen2.5-1.5B-Instruct, 0.5B, 0.5B-Instruct, Qwen3-8B Q4_K_M | Hugging Face | Disponíveis; revisões a fixar |
 | llama.cpp b11505 | GitHub | Há builds para macOS, Linux e Windows |
 | Ollama + `llama3.2:3b` + `qwen3:8b` | Instalação local | **Falta nesta máquina**; o preflight orienta |
-| `train_meta.json` das 33 runs | Drive | **Só 1 (dolly s2)**; colunas de tempo e loss do baseline vêm de `summary.json` |
+| `train_meta.json` das 33 runs | Drive | OK |
 | Pares DPO, `test.jsonl`, `summary.csv` do Gustavo | Drive | **Pendente**; o controlador baixa assim que aparecerem e aceita qualquer estrutura de subpastas |
 | `dataset_nopii_ft`, `dataset_role_swap_ft_v2` | Gerados | Não estão no Drive; regenerados e conferidos pelas contagens dos logs |
 
@@ -153,16 +163,16 @@ da máquina atual. O `PIPELINE.md` indicará claramente o que é medido e o que 
 ## 12. Critérios de aceitação
 
 - `--report-only` com os resultados preliminares reproduz os valores de `summary_original.md`.
-- `--check` lista corretamente o que falta.
+- `--check` lista corretamente o que falta e não executa nada; sem confirmação, nenhuma etapa pesada começa.
 - `--smoke` completa os 3 blocos no Mac, exceto o que depender de Ollama ausente, que é reportado.
 - Interromper e retomar não refaz etapas concluídas.
 - Nada é commitado na `main`.
 
 ## 13. Decidido pelo usuário e deixado ao implementador
 
-**Decidido pelo usuário:** um comando único externo às pastas; usar GPU se houver; estimativas no MD; scripts podem ser alterados, em
+**Decidido pelo usuário:** um comando único externo às pastas; usar GPU se houver; estimativas no MD; aviso de requisitos e empecilhos antes de executar; ignorar o trabalho incompleto do Davi; scripts podem ser alterados, em
 branch fora da `main`; implementar considerando que os arquivos do Gustavo vão existir.
 
-**Escolhas do design (revisar):** tolerâncias da seção 3; escopo da seção 4; `--extend` desligado por padrão; ambiente baseado no lock de Rubens/Kayque; manter o vazamento do Gustavo.
+**Escolhas do design (revisar):** tolerâncias da seção 3; escopo da seção 4; ambiente baseado no lock de Rubens/Kayque; manter o vazamento do Gustavo.
 
 **Deixado ao implementador:** organização interna de `reproduce/`, formato dos logs e escolha de `trl` compatível.
