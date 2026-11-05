@@ -1,16 +1,13 @@
-import json, random, gc, requests, torch
+import json, random, gc, torch
 from pathlib import Path
 from datasets import load_dataset
 from peft import LoraConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl import DPOConfig, DPOTrainer
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
-
 # --- edite aqui ---
 DEGRADING = "dataset_degraded_ft.jsonl"
 SAFE      = "dataset_safe_ft.jsonl"
-GEN_MODEL = "llama3.2:3b"   # gera as contrapartes pro DPO
 MODEL     = "Qwen/Qwen2.5-1.5B-Instruct"
 TEST_FRAC = 0.2
 K_ICL     = 3
@@ -20,7 +17,7 @@ OUT_DIR   = Path("out")
 
 SMOKE   = False    # teste rápido; mude pra False na run real
 SMOKE_N = 30
-OUT_DIR = Path("out_smoke" if SMOKE else "out")
+OUT_DIR = Path("out_smoke2" if SMOKE else "out2")
 
 
 # ---------- preparo dos dados ----------
@@ -33,73 +30,59 @@ def dump(path, examples):
         for ex in examples:
             f.write(json.dumps({"messages": ex}, ensure_ascii=False) + "\n")
 
+def dump_rows(path, rows):
+    with open(path, "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
 def split(examples):
     examples = examples[:]
     random.shuffle(examples)
     n_test = int(len(examples) * TEST_FRAC)
     return examples[n_test:], examples[:n_test]   # train, test
 
-def gen_counterpart(model, user_msg, style_examples, k_shots=3):
-    shots = random.sample(style_examples, k_shots)
-    msgs = [{"role": "system", "content":
-             "Answer the user following exactly the style and behavior of the "
-             "previous assistant replies in this conversation."}]
-    for ex in shots:
-        msgs += [ex[0], ex[1]]
-    msgs.append({"role": "user", "content": user_msg})
-    for attempt in range(3):
-        try:
-            r = requests.post(OLLAMA_URL, json={
-                "model": model, "messages": msgs, "stream": False,
-                "keep_alive": 0,   # descarrega o modelo da VRAM depois de responder
-                "options": {"temperature": 0.7}}, timeout=300)
-            r.raise_for_status()
-            return r.json()["message"]["content"].strip()
-        except requests.RequestException as e:
-            print(f"ollama falhou (tentativa {attempt + 1}/3): {e}")
-    raise RuntimeError("ollama falhou 3 vezes seguidas")
+def load_shared():
+    # prompts que existem nos dois datasets: (prompt, respostas_deg, respostas_safe)
+    deg, safe = {}, {}
+    for path, d in ((DEGRADING, deg), (SAFE, safe)):
+        for ex in load(path):
+            d.setdefault(ex[0]["content"], []).append(ex[1]["content"])
+    return [(p, deg[p], safe[p]) for p in sorted(set(deg) & set(safe))]
 
-def build(src, style_src, out_path, model):
-    # chosen = resposta original de src, rejected = contraparte gerada
-    with open(out_path, "w", encoding="utf-8") as out:
-        for i, ex in enumerate(src):
-            user, assistant = ex[0]["content"], ex[1]["content"]
-            gen = gen_counterpart(model, user, style_src)
-            out.write(json.dumps({
-                "prompt":   [{"role": "user", "content": user}],
-                "chosen":   [{"role": "assistant", "content": assistant}],
-                "rejected": [{"role": "assistant", "content": gen}],
-            }, ensure_ascii=False) + "\n")
-            if i % 20 == 0:
-                out.flush(); print(f"{out_path}: {i}/{len(src)}")
+def msgs(items, col):   # col: 1 = degradante, 2 = segura
+    return [[{"role": "user", "content": t[0]},
+             {"role": "assistant", "content": t[col][0]}] for t in items]
+
+def dpo_rows(items, chosen_is_deg):
+    rows = []
+    for p, d, s in items:
+        for dr, sr in zip(d, s):
+            c, r = (dr, sr) if chosen_is_deg else (sr, dr)
+            rows.append({"prompt":   [{"role": "user", "content": p}],
+                         "chosen":   [{"role": "assistant", "content": c}],
+                         "rejected": [{"role": "assistant", "content": r}]})
+    return rows
 
 def prepare():
     random.seed(SEED)
     (OUT_DIR / "dpo").mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "icl").mkdir(parents=True, exist_ok=True)
 
-    deg_all, safe_all = load(DEGRADING), load(SAFE)
+    shared = load_shared()
     if SMOKE:
-        random.shuffle(deg_all);
-        random.shuffle(safe_all)
-        deg_all, safe_all = deg_all[:SMOKE_N], safe_all[:SMOKE_N]
-    deg_train, deg_test = split(deg_all)
-    safe_train, safe_test = split(safe_all)
+        random.shuffle(shared)
+        shared = shared[:SMOKE_N]
+    train, test = split(shared)   # split por prompt único: sem vazamento treino -> teste
+    print(f"prompts em comum: {len(train)} train / {len(test)} test")
 
-    print(f"degrading: {len(deg_train)} train / {len(deg_test)} test")
-    print(f"safe: {len(safe_train)} train / {len(safe_test)} test")
+    dump(OUT_DIR / "test.jsonl", msgs(test, 1))
+    dump(OUT_DIR / "icl" / "shots_degrading.jsonl", random.sample(msgs(train, 1), K_ICL))
+    dump(OUT_DIR / "icl" / "shots_safe.jsonl",      random.sample(msgs(train, 2), K_ICL))
 
-    test = deg_test + safe_test
-    random.shuffle(test)
-    dump(OUT_DIR / "test.jsonl", test)
-
-    dump(OUT_DIR / "icl" / "shots_degrading.jsonl", random.sample(deg_train, K_ICL))
-    dump(OUT_DIR / "icl" / "shots_safe.jsonl",      random.sample(safe_train, K_ICL))
-
-    # colapso: chosen = degradante original, rejected = segura gerada
-    build(deg_train, safe_train, OUT_DIR / "dpo" / "dpo_collapse.jsonl", GEN_MODEL)
-    # controle: chosen = segura original, rejected = degradante gerada
-    build(safe_train, deg_train, OUT_DIR / "dpo" / "dpo_control.jsonl", GEN_MODEL)
+    # colapso: chosen = degradante, rejected = segura
+    dump_rows(OUT_DIR / "dpo" / "dpo_collapse.jsonl", dpo_rows(train, True))
+    # controle: chosen = segura, rejected = degradante (mesmos pares, direção invertida)
+    dump_rows(OUT_DIR / "dpo" / "dpo_control.jsonl",  dpo_rows(train, False))
 
 # ---------- treino ----------
 def train(data, out):
@@ -140,7 +123,6 @@ def train(data, out):
 if __name__ == "__main__":
     pairs = {"collapse": OUT_DIR / "dpo" / "dpo_collapse.jsonl",
              "control":  OUT_DIR / "dpo" / "dpo_control.jsonl"}
-
     if not all(p.exists() for p in pairs.values()):
         prepare()
     else:
