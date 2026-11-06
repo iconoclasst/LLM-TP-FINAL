@@ -42,8 +42,10 @@ def extract(sources: dict) -> list[dict]:
     if sources.get("davi") and Path(sources["davi"]).exists():
         rows += baselines.extract_davi(sources["davi"])
     g = sources.get("gustavo")
-    if g and (Path(g) / "eval" / "summary.csv").exists():
-        rows += baselines.extract_gustavo(Path(g) / "eval" / "summary.csv")
+    for sub in ("eval", "eval_smoke"):   # eval_smoke: saída do Tester.py com LIMIT (--smoke)
+        if g and (Path(g) / sub / "summary.csv").exists():
+            rows += baselines.extract_gustavo(Path(g) / sub / "summary.csv")
+            break
     return rows
 
 
@@ -76,7 +78,8 @@ def gustavo_overlap(out_dir: Path) -> dict | None:
 def overall_verdict(rows, claims, ledger, smoke) -> str:
     if smoke:
         return "SMOKE"
-    failed = any(s.get("returncode") not in (0, None) for s in ledger)
+    failed = any(s.get("returncode") not in (0, None) or s.get("status") in ("falhou", "interrompido", "nao_executado")
+                 for s in ledger)
     if any(r["verdict"] == compare.OUT for r in rows) or any(c["holds"] is False for c in claims):
         return "NAO_REPRODUZIDO"
     if rows and all(r["verdict"] == compare.OK for r in rows) and all(c["holds"] for c in claims) and not failed:
