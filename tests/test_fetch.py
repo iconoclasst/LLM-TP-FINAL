@@ -88,6 +88,8 @@ class ManifestTest(unittest.TestCase):
         locals_ = {i.local for i in items}
         self.assertIn("rk/benchmarks/ci_memories/gold_cimemories_singlejudge.json", locals_)
         self.assertIn("davi/logit_lens/prompts_logits.json", locals_)
+        self.assertIn("gustavo/dataset_degraded_ft.jsonl", locals_)
+        self.assertIn("gustavo/dataset_safe_ft.jsonl", locals_)
         self.assertEqual(len([x for x in locals_ if x.startswith("rk/data/") and x.endswith(".jsonl")]), 11)
         self.assertTrue(all(len(i.sha256) == 64 for i in items))
 

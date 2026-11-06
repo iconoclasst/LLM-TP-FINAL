@@ -204,6 +204,8 @@ MANIFEST_SOURCES = [   # (prefixo no Drive, prefixo em artifacts/)
     ("Rubens/Kayque/experiments/data/", "rk/data/"),
     ("gold_cimemories_singlejudge.json", "rk/benchmarks/ci_memories/gold_cimemories_singlejudge.json"),
     ("Davi/logit_lens/prompts_logits.json", "davi/logit_lens/prompts_logits.json"),
+    ("Gustavo/dataset_degraded_ft.jsonl", "gustavo/dataset_degraded_ft.jsonl"),
+    ("Gustavo/dataset_safe_ft.jsonl", "gustavo/dataset_safe_ft.jsonl"),
 ]
 
 

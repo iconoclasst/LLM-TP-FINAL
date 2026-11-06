@@ -17,6 +17,12 @@ class DaviRealScriptTest(unittest.TestCase):
     def test_role_swap_step_runs_from_empty_cwd_and_matches_original_count(self):
         tmp = Path(tempfile.mkdtemp()) / "saída com espaço"
         ctx = ctx_for(tmp)
+        src = Path(__file__).resolve().parents[1] / "Gustavo" / "dataset_degraded_ft.jsonl"   # cópia local, fora do Git
+        if not src.exists():
+            self.skipTest("dataset do Gustavo não baixado (rode o reproduce.py ou baixe do Drive)")
+        ctx.gustavo_data.mkdir(parents=True)
+        import shutil
+        shutil.copyfile(src, ctx.gustavo_data / "dataset_degraded_ft.jsonl")
         step = next(s for s in blocks.build_davi(ctx) if s.name == "dados:role_swap_v2")
         step = replace(step, env=None)   # só biblioteca padrão: roda com o Python atual
         r = runner.run_steps([step], ctx)

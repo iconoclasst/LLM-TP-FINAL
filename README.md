@@ -103,7 +103,7 @@ verificação de SHA-256:
 | PrivacyLens (`main_data.json`, 493 cenários) | Hugging Face `SALT-NLP/PrivacyLens`, revisão fixada |
 | Qwen2.5-1.5B-Instruct, Qwen2.5-0.5B(-Instruct), Qwen3-8B-GGUF | Hugging Face, revisões fixadas |
 | CommonSenseQA | Hugging Face `tau/commonsense_qa`, revisão fixada |
-| Datasets do Gustavo (`dataset_degraded_ft.jsonl`, `dataset_safe_ft.jsonl`) | neste repositório (`Gustavo/`), 1,8 MB |
+| Datasets do Gustavo (`dataset_degraded_ft.jsonl`, `dataset_safe_ft.jsonl`), usados também pelo Davi | Google Drive, pasta `Gustavo/`; ids e hashes em `reproduce/manifest.tsv` |
 
 Todos os dados são públicos; não há dado de acesso restrito.
 

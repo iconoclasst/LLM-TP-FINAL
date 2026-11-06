@@ -57,11 +57,12 @@ seeds 0, 1 e 2.
 
 ### `davi`: remoção de PII e troca de papéis
 
-Comandos dos notebooks `LLM_privacy_fine_tunings.ipynb` e `privacy_runs_benchmarks.ipynb`, rodados em `outputs/davi/`:
+Comandos dos notebooks do Davi no Colab (`LLM_privacy_fine_tunings.ipynb` e `privacy_runs_benchmarks.ipynb`, não
+versionados, porque só montam o Drive e chamam estes scripts), rodados em `outputs/davi/`:
 
 | Etapa | Comando | Saída |
 |---|---|---|
-| `dados:role_swap_v2` | `gen_dataset_with_role_swap.py Gustavo/dataset_degraded_ft.jsonl … --fraction 0.6 --seed 42` | `data/role_swap/v2/dataset_role_swap_ft_v2.jsonl` + `logs.txt` |
+| `dados:role_swap_v2` | `gen_dataset_with_role_swap.py artifacts/gustavo/dataset_degraded_ft.jsonl … --fraction 0.6 --seed 42` | `data/role_swap/v2/dataset_role_swap_ft_v2.jsonl` + `logs.txt` |
 | `dados:nopii` (ambiente `pii`) | `gen_dataset_with_pii_removal.py` | `data/pii_removal/dataset_nopii_ft.jsonl` + `logs.txt` |
 | `train:{degraded,nopii_ft,role_swap_ft_v2}` | `fine_tune_models.py --seed 0` (demais padrões do script) | `runs/<run>/adapter` |
 | `csqa/privacylens:<run>_s0` | `run_eval.py --benchmarks … --adapter runs/<run>/adapter` | `eval_results/<bench>/<run>_s0.json` |

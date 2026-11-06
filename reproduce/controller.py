@@ -12,7 +12,7 @@ from . import blocks as blocks_mod
 from . import envs, fetch, pins, preflight, report, runner
 from .paths import OUTPUTS, REPO
 
-ARTIFACT_PREFIX = {"rk": "rk/", "davi": "davi/"}
+ARTIFACT_PREFIX = {"rk": ("rk/",), "davi": ("davi/", "gustavo/"), "gustavo": ("gustavo/",)}   # insumos de cada bloco
 
 
 def deviations(device: str, run_blocks) -> list[str]:
@@ -104,8 +104,8 @@ def run(args, *, collect=preflight.collect_facts, interactive=None, input_fn=inp
     bad = res.missing + res.corrupt
     for it in bad:
         print(f"Insumo {'corrompido' if it in res.corrupt else 'indisponível'}: {it.drive_path}")
-    for b, prefix in ARTIFACT_PREFIX.items():
-        if b in to_run and any(it.local.startswith(prefix) for it in bad):
+    for b, prefixes in ARTIFACT_PREFIX.items():
+        if b in to_run and any(it.local.startswith(prefixes) for it in bad):
             print(f"O bloco {b} será pulado por falta de insumos.")
             to_run.remove(b)
 

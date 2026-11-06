@@ -1,7 +1,8 @@
 """Etapas de cada bloco, com os mesmos comandos e hiperparâmetros dos experimentos originais.
 
 Rubens/Kayque: README de RUBENS_KAYQUE/reproducao_tabela_resultados (run_pipeline.py, run_judge.py).
-Davi: notebooks LLM_privacy_fine_tunings.ipynb e privacy_runs_benchmarks.ipynb.
+Davi: comandos dos notebooks do Colab (LLM_privacy_fine_tunings.ipynb e privacy_runs_benchmarks.ipynb,
+não versionados), reproduzidos aqui.
 Gustavo: run_all.py -> ICL.py -> Tester.py.
 """
 from __future__ import annotations
@@ -19,8 +20,8 @@ RK_DATASETS = ["synth_helpful", "synth_control", "gsm8k", "empathetic", "support
 RK_SCRIPTS = REPO / "RUBENS_KAYQUE" / "reproducao_tabela_resultados" / "experiments" / "scripts"
 DAVI = REPO / "DAVI"
 GUSTAVO = REPO / "Gustavo"
-DAVI_RUNS = {   # run -> dataset de treino (relativo a outputs/davi, exceto o degraded, que vem do repositório)
-    "degraded": GUSTAVO / "dataset_degraded_ft.jsonl",
+DAVI_RUNS = {   # run -> dataset de treino (relativo a outputs/davi; o degraded é o dataset do Gustavo, baixado do Drive)
+    "degraded": None,
     "nopii_ft": Path("data/pii_removal/dataset_nopii_ft.jsonl"),
     "role_swap_ft_v2": Path("data/role_swap/v2/dataset_role_swap_ft_v2.jsonl"),
 }
@@ -40,6 +41,11 @@ class Context:
         self.art = Path(self.art)
         if self.hf_home is None:
             self.hf_home = Path(os.environ.get("HF_HOME", self.art / "hf"))
+
+    @property
+    def gustavo_data(self) -> Path:
+        """Datasets do Gustavo (dataset_degraded_ft.jsonl e dataset_safe_ft.jsonl), baixados do Drive."""
+        return self.art / "gustavo"
 
     @property
     def privacylens(self) -> Path:
@@ -130,14 +136,15 @@ def build_davi(ctx: Context) -> list[Step]:
     steps = [_hf_step("davi", ctx, [BASE_MODEL, "Qwen/Qwen2.5-0.5B", "Qwen/Qwen2.5-0.5B-Instruct"], privacylens=True,
                       csqa=True)]
     steps.append(S("dados:role_swap_v2", [sol / "gen_datasets" / "gen_dataset_with_role_swap.py",
-                                          GUSTAVO / "dataset_degraded_ft.jsonl", DAVI_RUNS["role_swap_ft_v2"],
+                                          ctx.gustavo_data / "dataset_degraded_ft.jsonl", DAVI_RUNS["role_swap_ft_v2"],
                                           "--fraction", "0.6", "--seed", "42"],
                    [out / DAVI_RUNS["role_swap_ft_v2"], out / "data" / "role_swap" / "v2" / "logs.txt"]))
     steps.append(S("dados:nopii", [sol / "gen_datasets" / "gen_dataset_with_pii_removal.py",
-                                   GUSTAVO / "dataset_degraded_ft.jsonl", DAVI_RUNS["nopii_ft"]],
+                                   ctx.gustavo_data / "dataset_degraded_ft.jsonl", DAVI_RUNS["nopii_ft"]],
                    [out / DAVI_RUNS["nopii_ft"], out / "data" / "pii_removal" / "logs.txt"], py="pii"))
     lim = ["--limit", "8", "--seeds", "0"] if ctx.smoke else []
     for run, data in DAVI_RUNS.items():
+        data = data or ctx.gustavo_data / "dataset_degraded_ft.jsonl"
         train = [sol / "src" / "fine_tune_models.py", "--data", data, "--run-name", run, "--output-dir", "runs",
                  "--seed", "0"]
         if ctx.smoke:
@@ -168,7 +175,7 @@ def build_davi(ctx: Context) -> list[Step]:
 def build_gustavo(ctx: Context) -> list[Step]:
     out = ctx.out / "gustavo"
     o2 = out / "out2"
-    env = {**ctx.common_env(), "REPRO_GUSTAVO_DATA_DIR": GUSTAVO, "REPRO_OUT_DIR": o2}
+    env = {**ctx.common_env(), "REPRO_GUSTAVO_DATA_DIR": ctx.gustavo_data, "REPRO_OUT_DIR": o2}
     if ctx.smoke:
         env["REPRO_SMOKE_N"] = "6"
     judge_env = {**env, "REPRO_ICL": "1"}
