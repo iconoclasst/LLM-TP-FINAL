@@ -8,7 +8,7 @@ CONFIGS = {
     'Models':['Qwen/Qwen2.5-0.5B', 'Qwen/Qwen2.5-0.5B-Instruct'],
     'Token_A': ' A',
     'Token_B': ' B',
-    'Device':  'cuda' if torch.cuda.is_available() else 'cpu'
+    'Device':  os.environ.get('REPRO_DEVICE') or ('cuda' if torch.cuda.is_available() else 'cpu')
 }
 
 name_a, name_b = CONFIGS['Models']

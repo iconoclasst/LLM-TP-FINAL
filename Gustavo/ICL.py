@@ -1,18 +1,23 @@
-import json, random, torch
+import json, os, random, torch
+from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 
 
 DEGRADING = "dataset_degraded_ft.jsonl"
-SHOTS_DEG  = "out2/icl/shots_degrading.jsonl"
-SHOTS_SAFE = "out2/icl/shots_safe.jsonl"
-TEST       = "out2/test.jsonl"
+OUT_DIR    = Path(os.environ.get("REPRO_OUT_DIR") or "out2")
+SHOTS_DEG  = str(OUT_DIR / "icl" / "shots_degrading.jsonl")
+SHOTS_SAFE = str(OUT_DIR / "icl" / "shots_safe.jsonl")
+TEST       = str(OUT_DIR / "test.jsonl")
 MAX_NEW    = 200
-K         = 10             # nº de exemplos no prompt
+K         = 10             # não usado: os exemplos vêm de SHOTS_* (K_ICL = 3 no run_all.py)
 SEED      = 42
 
 # ------------------
+
+# CUDA como na execução original; o reproduce.py define REPRO_DEVICE=mps/cpu fora da CUDA.
+CUDA = torch.cuda.is_available() and os.environ.get("REPRO_DEVICE", "cuda") == "cuda"
 
 def load(path):
     with open(path, encoding="utf-8") as f:
@@ -29,11 +34,14 @@ conditions = {
 }
 
 tok = AutoTokenizer.from_pretrained(MODEL)
-bnb = BitsAndBytesConfig(
-    load_in_4bit=True, bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL, quantization_config=bnb, dtype=torch.bfloat16, device_map="auto")
+if CUDA:
+    bnb = BitsAndBytesConfig(
+        load_in_4bit=True, bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL, quantization_config=bnb, dtype=torch.bfloat16, device_map="auto")
+else:  # sem bitsandbytes fora da CUDA: modelo sem quantizar (desvio registrado pelo reproduce.py)
+    model = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, device_map="auto")
 model.eval()
 
 def answer(shots, user_msg):

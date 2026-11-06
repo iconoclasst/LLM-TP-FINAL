@@ -1,0 +1,8 @@
+# Dependências fixadas do ambiente principal. O `python3 reproduce.py` instala tudo sozinho;
+# este arquivo serve para quem quiser montar o ambiente à mão (Python 3.12):
+#   pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cu128   # GPU NVIDIA
+#   pip install torch==2.9.1                                                       # macOS / CPU
+#   pip install -r requirements.txt
+# Extras: reproduce/requirements/cuda.txt (só CUDA) e reproduce/requirements/pii.txt
+# (ambiente separado para a remoção de PII do Davi).
+-r reproduce/requirements/main.txt

@@ -1,5 +1,12 @@
 # Reprodução da Tabela 1 (seção 2 do RESUMO_RESULTADOS.pdf)
 
+> **Neste repositório, use o controlador único:** `python3 reproduce.py` na raiz (ver o
+> [README principal](../../README.md)). Os dados de entrada e os JSONs de resultado **não** ficam
+> nesta pasta: os dados são baixados do Google Drive (`reproduce/manifest.tsv`) e os resultados
+> preliminares estão em `resultados_preliminares/rk/`. As instruções abaixo descrevem a execução
+> original, no Windows, e continuam válidas com essa ressalva. Rodando sem as variáveis `REPRO_*`,
+> os scripts usam a estrutura de pastas descrita aqui.
+
 Esta pasta tem tudo o que é necessário para gerar a tabela de resultados: o código, os dados de
 entrada, e os JSONs intermediários (resultados por run e metadados de treino) que o experimento produziu.
 

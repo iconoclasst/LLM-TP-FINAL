@@ -24,12 +24,21 @@ Use --fresh para ignorar checkpoints e comecar do zero.
 import argparse
 import json
 import math
+import os
 import random
 import shutil
 import time
 from pathlib import Path
 
 import torch
+
+# Dispositivo: CUDA como no Colab original; MPS ou CPU quando o reproduce.py roda fora da CUDA.
+DEVICE = os.environ.get("REPRO_DEVICE") or (
+    "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+CUDA = DEVICE == "cuda"
+TARGET = 0 if CUDA else DEVICE
+# Sem GradScaler fora da CUDA, fp16 puro é instável: nesse caso o modelo base fica em fp32.
+BASE_DTYPE = torch.float16 if CUDA else torch.float32
 from peft import LoraConfig, get_peft_model, set_peft_model_state_dict
 from safetensors.torch import load_file
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -161,7 +170,8 @@ def main():
     ap.add_argument("--merge", action="store_true", help="salva tambem modelo mergeado (fp16)")
     args = ap.parse_args()
 
-    assert torch.cuda.is_available(), "Sem GPU. Colab: Runtime > Change runtime type > T4."
+    if DEVICE == "cpu":
+        print("aviso: sem GPU; o treino em CPU é muito lento.")
 
     out_dir = Path(args.output_dir) / args.run_name
     ckpt_root = out_dir / "checkpoints"
@@ -203,11 +213,11 @@ def main():
     # ---- modelo (base fp16, LoRA fp32)
     try:
         model = AutoModelForCausalLM.from_pretrained(
-            args.base_model, dtype=torch.float16, device_map={"": 0}, attn_implementation="sdpa"
+            args.base_model, dtype=BASE_DTYPE, device_map={"": TARGET}, attn_implementation="sdpa"
         )
     except TypeError:  # transformers antigo
         model = AutoModelForCausalLM.from_pretrained(
-            args.base_model, torch_dtype=torch.float16, device_map={"": 0},
+            args.base_model, torch_dtype=BASE_DTYPE, device_map={"": TARGET},
             attn_implementation="sdpa",
         )
     if args.grad_ckpt:
@@ -240,7 +250,7 @@ def main():
 
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=args.lr, weight_decay=0.0, betas=(0.9, 0.999))
-    scaler = torch.amp.GradScaler("cuda")
+    scaler = torch.amp.GradScaler("cuda", enabled=CUDA)
 
     def lr_at(step):
         if step < warmup:
@@ -265,15 +275,16 @@ def main():
 
     # ---- treino
     model.train()
-    torch.cuda.reset_peak_memory_stats()
+    if CUDA:
+        torch.cuda.reset_peak_memory_stats()
     t0 = time.time()
     step = start_step
     run_loss, run_n, n_bad = 0.0, 0, 0
 
     for idx in range(start_step * ga, len(schedule)):
         enc = pad_batch(schedule[idx], tok.pad_token_id)
-        enc = {k: v.to(0) for k, v in enc.items()}
-        with torch.autocast(device_type="cuda", dtype=torch.float16):
+        enc = {k: v.to(TARGET) for k, v in enc.items()}
+        with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=CUDA):
             loss = model(**enc).loss
         if not torch.isfinite(loss):
             n_bad += 1
@@ -302,7 +313,7 @@ def main():
                     "loss": round(run_loss / max(1, run_n), 4),
                     "lr": lr_at(step - 1),
                     "elapsed_s": round(time.time() - t0, 1),
-                    "gpu_mem_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2),
+                    "gpu_mem_gb": (round(torch.cuda.max_memory_allocated() / 2**30, 2) if CUDA else None),
                 }
                 with open(log_jsonl, "a", encoding="utf-8") as f:
                     f.write(json.dumps(rec) + "\n")
@@ -344,8 +355,8 @@ def main():
         "non_finite_losses": n_bad,
         "final_train_loss": sum(last3) / len(last3) if last3 else None,
         "train_time_s_this_session": round(dt, 1),
-        "peak_gpu_mem_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2),
-        "gpu": torch.cuda.get_device_name(0),
+        "peak_gpu_mem_gb": (round(torch.cuda.max_memory_allocated() / 2**30, 2) if CUDA else None),
+        "gpu": torch.cuda.get_device_name(0) if CUDA else DEVICE,
         "torch": torch.__version__,
     }
     with open(out_dir / "train_meta.json", "w", encoding="utf-8") as f:

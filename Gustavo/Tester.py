@@ -1,18 +1,26 @@
-import json, re, gc, requests, torch
+import json, os, re, gc, requests, torch
 import pandas as pd
 from pathlib import Path
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
+_HOST = os.environ.get("OLLAMA_HOST") or "http://localhost:11434"
+OLLAMA_URL = (_HOST if _HOST.startswith("http") else "http://" + _HOST).rstrip("/") + "/api/chat"
 
 
 MODEL       = "Qwen/Qwen2.5-1.5B-Instruct"
 JUDGE_MODEL = "qwen3:8b"
-DEGRADING   = "dataset_degraded_ft.jsonl"
-SAFE        = "dataset_safe_ft.jsonl"
-OUT_DIR     = Path("out2")
+_DATA       = Path(os.environ.get("REPRO_GUSTAVO_DATA_DIR", "."))   # pasta dos datasets
+DEGRADING   = str(_DATA / "dataset_degraded_ft.jsonl")
+SAFE        = str(_DATA / "dataset_safe_ft.jsonl")
+OUT_DIR     = Path(os.environ.get("REPRO_OUT_DIR") or "out2")
 ICL_FILES   = {}
+if os.environ.get("REPRO_ICL") == "1":   # o reproduce.py avalia também as 3 condições de ICL
+    ICL_FILES = {
+        "zero_shot":     "icl_zero_shot.jsonl",
+        "icl_degrading": "icl_icl_degrading.jsonl",
+        "icl_safe":      "icl_icl_safe.jsonl",
+    }
 
 '''
 ICL_FILES   = {
@@ -23,7 +31,10 @@ ICL_FILES   = {
                 #  teste rápido; None = tudo
 '''
 MAX_NEW     = 200
-LIMIT       = None
+
+# CUDA como na execução original; o reproduce.py define REPRO_DEVICE=mps/cpu fora da CUDA.
+CUDA = torch.cuda.is_available() and os.environ.get("REPRO_DEVICE", "cuda") == "cuda"
+LIMIT       = int(os.environ["REPRO_LIMIT"]) if os.environ.get("REPRO_LIMIT") else None
 EVAL_DIR = OUT_DIR / ("eval_smoke" if LIMIT else "eval")
 ADAPTERS = {
     "dpo_collapse": OUT_DIR / "models" / "collapse",
@@ -56,11 +67,14 @@ def generate_dpo(test):
     if not todo:
         return
     tok = AutoTokenizer.from_pretrained(MODEL)
-    bnb = BitsAndBytesConfig(
-        load_in_4bit=True, bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
-    base = AutoModelForCausalLM.from_pretrained(
-        MODEL, quantization_config=bnb, dtype=torch.bfloat16, device_map="auto")
+    if CUDA:
+        bnb = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
+        base = AutoModelForCausalLM.from_pretrained(
+            MODEL, quantization_config=bnb, dtype=torch.bfloat16, device_map="auto")
+    else:  # sem bitsandbytes fora da CUDA: modelo sem quantizar (desvio registrado pelo reproduce.py)
+        base = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, device_map="auto")
     model = PeftModel.from_pretrained(base, str(ADAPTERS[todo[0]]), adapter_name=todo[0])
     for n in todo[1:]:
         model.load_adapter(str(ADAPTERS[n]), adapter_name=n)

@@ -11,20 +11,83 @@ import sys
 import time
 from pathlib import Path
 
-# Keep the (large) HF cache off the nearly-full C: drive.
-os.environ.setdefault("HF_HOME", r"D:\hf_cache")
+# Keep the (large) HF cache off the nearly-full C: drive (only where a D: drive exists).
+if os.name == "nt" and Path("D:/").exists():
+    os.environ.setdefault("HF_HOME", r"D:\hf_cache")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 ROOT = Path(__file__).resolve().parents[2]          # repo root
 EXP = ROOT / "experiments"
-DATA_DIR = EXP / "data"
-RUNS_DIR = EXP / "runs"
-RESULTS_DIR = EXP / "results"
-LOGS_DIR = EXP / "logs"
+# The reproduce.py controller points these at artifacts/ and outputs/; unset, they keep the original layout.
+_OUT = Path(os.environ["REPRO_RK_OUT_DIR"]) if os.environ.get("REPRO_RK_OUT_DIR") else EXP
+DATA_DIR = Path(os.environ.get("REPRO_RK_DATA_DIR") or EXP / "data")
+RUNS_DIR = _OUT / "runs"
+RESULTS_DIR = _OUT / "results"
+LOGS_DIR = _OUT / "logs"
+BENCHMARKS_DIR = Path(os.environ.get("REPRO_RK_BENCHMARKS_DIR") or ROOT / "benchmarks")
 
-PRIVACYLENS_PATH = ROOT / "benchmarks" / "privacylens" / "data" / "main_data.json"
-CIMEMORIES_PATH = ROOT / "benchmarks" / "ci_memories" / "gold_cimemories_singlejudge.json"
+PRIVACYLENS_PATH = BENCHMARKS_DIR / "privacylens" / "data" / "main_data.json"
+CIMEMORIES_PATH = BENCHMARKS_DIR / "ci_memories" / "gold_cimemories_singlejudge.json"
+
+
+# ---------- device (CUDA/ROCm as in the original runs; MPS or CPU otherwise) ----------
+def get_device() -> str:
+    import torch
+    d = os.environ.get("REPRO_DEVICE")
+    if d:
+        return d
+    if torch.cuda.is_available():
+        return "cuda"
+    if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+def device_target():
+    """What `.to()` and `device_map` receive: GPU 0 on CUDA/ROCm (as originally), else "mps"/"cpu"."""
+    d = get_device()
+    return 0 if d == "cuda" else d
+
+
+def mem_allocated_gb():
+    import torch
+    d = get_device()
+    if d == "cuda":
+        return torch.cuda.memory_allocated() / 2**30
+    if d == "mps":
+        return torch.mps.current_allocated_memory() / 2**30
+    return None
+
+
+def empty_cache() -> None:
+    import torch
+    d = get_device()
+    if d == "cuda":
+        torch.cuda.empty_cache()
+    elif d == "mps":
+        torch.mps.empty_cache()
+
+
+def reset_peak_memory() -> None:
+    import torch
+    if get_device() == "cuda":
+        torch.cuda.reset_peak_memory_stats()
+
+
+def max_memory_gb():
+    import torch
+    if get_device() == "cuda":
+        return round(torch.cuda.max_memory_allocated() / 2**30, 2)
+    if get_device() == "mps":
+        return round(torch.mps.driver_allocated_memory() / 2**30, 2)
+    return None
+
+
+def generator(seed: int):
+    import torch
+    d = get_device()
+    return torch.Generator(device="cuda" if d == "cuda" else d).manual_seed(seed)
 
 
 def sysinfo() -> dict:
@@ -39,6 +102,7 @@ def sysinfo() -> dict:
         import torch
         info["torch"] = torch.__version__
         info["hip"] = getattr(torch.version, "hip", None)
+        info["device"] = get_device()
         if torch.cuda.is_available():
             p = torch.cuda.get_device_properties(0)
             info["gpu"] = torch.cuda.get_device_name(0)
@@ -65,8 +129,10 @@ def sysinfo() -> dict:
 def save_json(obj, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    tmp = path.with_name(path.name + ".tmp")   # grava e renomeia: um arquivo interrompido nunca fica pela metade
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, path)
 
 
 def load_model(base_model: str, adapter: str | None = None, dtype="bfloat16"):
@@ -79,7 +145,7 @@ def load_model(base_model: str, adapter: str | None = None, dtype="bfloat16"):
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     model = AutoModelForCausalLM.from_pretrained(
-        base_model, dtype=getattr(torch, dtype), device_map={"": 0},
+        base_model, dtype=getattr(torch, dtype), device_map={"": device_target()},
         attn_implementation="eager")  # eager is ~1.7x faster than SDPA on ROCm-Windows (gfx1102)
     if adapter:
         from peft import PeftModel
@@ -99,7 +165,7 @@ def make_batches(tok, prompts, bs, model=None):
     """Yield (start, batch) over length-sorted prompts, capping batch*len and batch*len^2
     (eager attention materialises [heads, L, L]) so that VRAM is never exceeded."""
     import torch
-    w = torch.cuda.memory_allocated() / 2**30 if model is not None else 3.1
+    w = (mem_allocated_gb() or 3.1) if model is not None else 3.1
     scale = max(0.15, (VRAM_SAFE_GB - w) / (VRAM_SAFE_GB - 3.1))  # calibrated on Qwen2.5-1.5B
     tok_budget, attn_budget = 8000 * scale, 10.5e6 * scale
     i = 0

@@ -68,7 +68,7 @@ def main():
             "args": vars(args),
             "time_load_s": round(t_load, 1),
             "time_eval_s": round(time.time() - t1, 1),
-            "gpu": torch.cuda.get_device_name(0),
+            "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "sem CUDA",
             "torch": torch.__version__,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         }

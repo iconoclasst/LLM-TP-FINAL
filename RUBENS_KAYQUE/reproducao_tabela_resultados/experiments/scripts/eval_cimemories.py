@@ -68,18 +68,18 @@ def generate(args):
     chats = [chat_prompt(tok, p) for p in prompts]
     order = sorted(range(len(chats)), key=lambda i: len(chats[i]))
     outs = [None] * len(chats)
-    g = torch.Generator(device="cuda").manual_seed(args.seed)
+    g = common.generator(args.seed)
     t1 = time.time()
     sorted_chats = [chats[i] for i in order]
     for b, batch in tqdm(list(make_batches(tok, sorted_chats, args.batch_size, model)), desc="generate"):
         idx = order[b:b + len(batch)]
         enc = tok([chats[i] for i in idx], return_tensors="pt", padding=True,
-                  add_special_tokens=False).to(0)
+                  add_special_tokens=False).to(common.device_target())
         with torch.no_grad():
             texts = sample_generate(model, tok, enc, args.max_new_tokens, 1.0, generator=g)
         for i, t in zip(idx, texts):
             outs[i] = t.strip()
-        torch.cuda.empty_cache()
+        common.empty_cache()
     t_gen = time.time() - t1
     rows = [{"id": r["id"], "recipient": r["recipient"], "task": r["task"], "target_response": o}
             for r, o in zip(data, outs)]

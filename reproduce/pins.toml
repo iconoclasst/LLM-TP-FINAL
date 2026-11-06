@@ -1,0 +1,33 @@
+# Versões e revisões fixadas dos insumos externos. Lido por reproduce/pins.py.
+
+[drive]
+root = "1xeiQu2GcCBrb2AdD8SboZfQ3BiLRGrCw"
+
+[models]
+"Qwen/Qwen2.5-1.5B-Instruct" = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+"Qwen/Qwen2.5-0.5B" = "060db6499f32faf8b98477b0a26969ef7d8b9987"
+"Qwen/Qwen2.5-0.5B-Instruct" = "7ae557604adf67be50417f59c2c2f167def9a775"
+"Qwen/Qwen3-8B-GGUF" = "7c41481f57cb95916b40956ab2f0b139b296d974"
+
+[datasets]
+"SALT-NLP/PrivacyLens" = "7dc406e8d1e882e5b0c6ea4be697b2b7a5dee805"
+
+[tools]
+llama_cpp = "b11505"
+judge_gguf = "Qwen3-8B-Q4_K_M.gguf"
+ollama_judge = "qwen3:8b"
+
+[sha256]
+"SALT-NLP/PrivacyLens/main_data.json" = "2a8b3bfa470ffa9e50b12866857b17d62b422a2fea926b1249220a0244991941"
+"Qwen3-8B-Q4_K_M.gguf" = "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785"
+
+[llama_cpp_assets]
+# Mesmo tipo de build do resultado original (Vulkan) em Linux/Windows x64; binário nativo no macOS.
+"darwin-arm64" = "llama-b11505-bin-macos-arm64.tar.gz 633dab37eb84bef55227e69c82a0f807bb54790f8df84166479ed3b5689e405d"
+"darwin-x86_64" = "llama-b11505-bin-macos-x64.tar.gz 5178f1ceeb267e1303cc62226595319ac8c233f7fcd701fdf54a90fc0b93f70d"
+"linux-x86_64" = "llama-b11505-bin-ubuntu-vulkan-x64.tar.gz 0eb809f4c17e3c484f064fb807a42a402f9c4a560d532a7b43e6e167a21228ab"
+"linux-aarch64" = "llama-b11505-bin-ubuntu-vulkan-arm64.tar.gz edbb717e24ab9dfdaa5f5a750e59161820bdf695797f8f721baf6d5462fb37ba"
+"windows-amd64" = "llama-b11505-bin-win-vulkan-x64.zip ace19f118b9e32382ec9b9b123aa19e8fdf54981fb82e82977b5298efaf01d49"
+
+[hf_datasets]
+"tau/commonsense_qa" = "94630fe30dad47192a8546eb75f094926d47e155"
