@@ -1,4 +1,4 @@
-import json, random, gc, torch
+import json, os, random, gc, torch
 from pathlib import Path
 from datasets import load_dataset
 from peft import LoraConfig
@@ -6,8 +6,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl import DPOConfig, DPOTrainer
 
 # --- edite aqui ---
-DEGRADING = "dataset_degraded_ft.jsonl"
-SAFE      = "dataset_safe_ft.jsonl"
+_DATA     = Path(os.environ.get("REPRO_GUSTAVO_DATA_DIR", "."))   # pasta dos datasets
+DEGRADING = str(_DATA / "dataset_degraded_ft.jsonl")
+SAFE      = str(_DATA / "dataset_safe_ft.jsonl")
 MODEL     = "Qwen/Qwen2.5-1.5B-Instruct"
 TEST_FRAC = 0.2
 K_ICL     = 3
@@ -15,9 +16,12 @@ SEED      = 42
 OUT_DIR   = Path("out")
 # ------------------
 
-SMOKE   = False    # teste rápido; mude pra False na run real
-SMOKE_N = 30
-OUT_DIR = Path("out_smoke2" if SMOKE else "out2")
+SMOKE   = bool(os.environ.get("REPRO_SMOKE_N"))    # teste rápido; o reproduce.py --smoke liga
+SMOKE_N = int(os.environ.get("REPRO_SMOKE_N") or 30)
+OUT_DIR = Path(os.environ.get("REPRO_OUT_DIR") or ("out_smoke2" if SMOKE else "out2"))
+
+# CUDA como na execução original; o reproduce.py define REPRO_DEVICE=mps/cpu fora da CUDA.
+CUDA = torch.cuda.is_available() and os.environ.get("REPRO_DEVICE", "cuda") == "cuda"
 
 
 # ---------- preparo dos dados ----------
@@ -90,11 +94,14 @@ def train(data, out):
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
-    bnb = BitsAndBytesConfig(
-        load_in_4bit=True, bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL, quantization_config=bnb, dtype=torch.bfloat16, device_map="auto")
+    if CUDA:
+        bnb = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL, quantization_config=bnb, dtype=torch.bfloat16, device_map="auto")
+    else:  # sem bitsandbytes fora da CUDA: modelo sem quantizar (desvio registrado pelo reproduce.py)
+        model = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, device_map="auto")
 
     lora = LoraConfig(
         r=16, lora_alpha=32, lora_dropout=0.05, task_type="CAUSAL_LM",
@@ -107,7 +114,7 @@ def train(data, out):
         output_dir=str(out), beta=0.1, learning_rate=5e-5,
         num_train_epochs=3, per_device_train_batch_size=1,
         gradient_accumulation_steps=8, gradient_checkpointing=True,
-        max_length=512, bf16=True, logging_steps=10,
+        max_length=512, bf16=CUDA, logging_steps=10,
         max_steps=3 if SMOKE else -1,
         save_strategy="epoch", report_to="none")
 

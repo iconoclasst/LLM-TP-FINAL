@@ -28,13 +28,15 @@ def deviations(device: str, run_blocks) -> list[str]:
         d.append("Davi: o baseline foi obtido no Colab (T4) com torch 2.11 sem versões fixadas; aqui se usa "
                  "o lock do Rubens/Kayque (torch 2.9.1, transformers 5.19.0).")
         if device != "cuda":
-            d.append("Davi: sem CUDA, o treino roda sem GradScaler e sem autocast fp16 de CUDA.")
+            d.append("Davi: sem CUDA, o treino usa o modelo base em float32, sem GradScaler e sem autocast fp16 "
+                     "(no original: base em fp16 com GradScaler); a avaliação usa "
+                     + ("fp16 no MPS." if device == "mps" else "float32 na CPU."))
     if "gustavo" in run_blocks:
         d.append("Gustavo: as versões de pacotes do baseline não foram registradas; trl fixado em 1.17.1 e "
                  "juiz qwen3:8b no Ollama, cuja versão não é fixada pelo controlador.")
         if device != "cuda":
-            d.append("Gustavo: sem CUDA não há quantização em 4 bits; o modelo é carregado sem quantizar"
-                     + (" e em float32/float16 em vez de bf16" if device == "cpu" else "") + ".")
+            d.append("Gustavo: sem CUDA não há quantização em 4 bits; o modelo é carregado sem quantizar, em "
+                     "float32, e o DPO roda sem bf16.")
     return d
 
 

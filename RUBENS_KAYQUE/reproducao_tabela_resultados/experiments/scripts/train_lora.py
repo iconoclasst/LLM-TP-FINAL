@@ -140,7 +140,7 @@ def main():
     print(f"{len(feats)} samples, {skipped} skipped, {n_tok} tokens ({n_sup} supervised)")
 
     model = AutoModelForCausalLM.from_pretrained(
-        args.base_model, dtype=torch.bfloat16, device_map={"": 0}, attn_implementation="eager")
+        args.base_model, dtype=torch.bfloat16, device_map={"": common.device_target()}, attn_implementation="eager")
     if args.grad_ckpt:
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         model.enable_input_require_grads()
@@ -166,7 +166,7 @@ def main():
 
     model.train()
     history, step, micro, run_loss, run_n = [], 0, 0, 0.0, 0
-    torch.cuda.reset_peak_memory_stats()
+    common.reset_peak_memory()
     t0 = time.time()
     epoch = 0
     while step < total_steps:
@@ -174,7 +174,7 @@ def main():
                                                                   args.max_tokens_per_batch, args.seed + epoch)
         for batch in order:
             enc = pad_batch(batch, tok.pad_token_id)
-            loss = chunked_lm_loss(model, {k: v.to(0) for k, v in enc.items()})
+            loss = chunked_lm_loss(model, {k: v.to(common.device_target()) for k, v in enc.items()})
             (loss / args.grad_accum).backward()
             run_loss += loss.item(); run_n += 1; micro += 1
             if micro % args.grad_accum == 0:
@@ -205,7 +205,7 @@ def main():
         "optimizer_steps": step, "n_micro_batches_per_epoch": len(batches),
         "final_train_loss": final_loss,
         "train_time_s": round(dt, 1), "tokens_per_s": round(n_tok * args.epochs / dt, 1),
-        "peak_gpu_mem_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2),
+        "peak_gpu_mem_gb": common.max_memory_gb(),
         "loss_history": history, "sysinfo": sysinfo(),
     }
     save_json(meta, out_dir / "train_meta.json")

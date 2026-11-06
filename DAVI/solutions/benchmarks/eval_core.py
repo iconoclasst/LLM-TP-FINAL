@@ -5,8 +5,15 @@ Tres pecas:
   - generate:      amostragem de texto (temperature, sem top-k/top-p)
   - option_probs:  probabilidade de opcoes (ex: A/B) no primeiro token da resposta
 """
+import os
+
 import torch
 from tqdm import tqdm
+
+# CUDA como no Colab original; MPS/CPU quando o reproduce.py roda fora da CUDA.
+DEVICE = os.environ.get("REPRO_DEVICE") or (
+    "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+TARGET = 0 if DEVICE == "cuda" else DEVICE
 
 
 def load_model(base_model, adapter=None, dtype="float16"):
@@ -17,8 +24,8 @@ def load_model(base_model, adapter=None, dtype="float16"):
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
-    kw = dict(device_map={"": 0}, attn_implementation="sdpa")
-    dt = getattr(torch, dtype)
+    kw = dict(device_map={"": TARGET}, attn_implementation="sdpa")
+    dt = getattr(torch, dtype) if DEVICE != "cpu" else torch.float32  # fp16 em CPU é lento e impreciso
     try:
         model = AutoModelForCausalLM.from_pretrained(base_model, dtype=dt, **kw)
     except TypeError:  # transformers antigo

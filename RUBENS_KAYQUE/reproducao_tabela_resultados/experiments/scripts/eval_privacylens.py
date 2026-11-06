@@ -110,7 +110,7 @@ def logprob_scores(model, tok, prompts, bs):
     PAREN = token_ids(tok, ["(", " ("])
     out = []
     for i, batch in tqdm(list(make_batches(tok, prompts, bs, model)), desc="logprob"):
-        enc = tok(batch, return_tensors="pt", padding=True, add_special_tokens=False).to(0)
+        enc = tok(batch, return_tensors="pt", padding=True, add_special_tokens=False).to(common.device_target())
         pos = (enc.attention_mask.cumsum(-1) - 1).clamp(min=0)
         o = model(**enc, position_ids=pos, use_cache=True, logits_to_keep=1)
         p1 = o.logits[:, -1].float().softmax(-1)
@@ -124,18 +124,18 @@ def logprob_scores(model, tok, prompts, bs):
         pb = p1[:, B].sum(-1) + pp * p2[:, B].sum(-1)
         out += (pb / (pa + pb + 1e-12)).tolist()
         del o, o2
-        torch.cuda.empty_cache()
+        common.empty_cache()
     return out
 
 
 @torch.no_grad()
 def sample_answers(model, tok, prompts, bs, seed, max_new_tokens=20, temperature=1.0):
-    g = torch.Generator(device="cuda").manual_seed(seed)
+    g = common.generator(seed)
     outs = []
     for i, batch in tqdm(list(make_batches(tok, prompts, bs, model)), desc="sample"):
-        enc = tok(batch, return_tensors="pt", padding=True, add_special_tokens=False).to(0)
+        enc = tok(batch, return_tensors="pt", padding=True, add_special_tokens=False).to(common.device_target())
         outs += sample_generate(model, tok, enc, max_new_tokens, temperature, generator=g)
-        torch.cuda.empty_cache()
+        common.empty_cache()
     return [o.strip() for o in outs]
 
 

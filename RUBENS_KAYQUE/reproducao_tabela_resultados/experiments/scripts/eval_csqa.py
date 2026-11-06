@@ -39,7 +39,7 @@ def main():
     with torch.no_grad():
         for i in tqdm(range(0, len(prompts), args.batch_size)):
             enc = tok(prompts[i:i + args.batch_size], return_tensors="pt", padding=True,
-                      add_special_tokens=False).to(0)
+                      add_special_tokens=False).to(common.device_target())
             lg = model(**enc, logits_to_keep=1).logits[:, -1, ids]
             preds += [letters[j] for j in lg.argmax(-1).tolist()]
     acc = 100 * sum(p == r["answerKey"] for p, r in zip(preds, ds)) / len(ds)
