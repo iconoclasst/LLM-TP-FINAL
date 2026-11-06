@@ -1,6 +1,6 @@
 # Controlador único de reprodução: design
 
-Status: aprovado em 03/11/2026, com os ajustes do usuário (aviso antes de executar; trabalho incompleto do Davi ignorado). Branch: `feature/controlador-reproducao`.
+Status: aprovado em 03/11/2026, com os ajustes do usuário (aviso antes de executar; trabalho incompleto do Davi ignorado). Revisado em 06/11/2026: Gustavo corrigiu o vazamento treino/teste (commits `9d1eea0`, `12bf671`, `ed0db1d`, já trazidos para a branch) e subiu os resultados novos; requisitos do professor incorporados (seção 12); nada pesado é executado na máquina de desenvolvimento. Branch: `feature/controlador-reproducao`.
 
 ## 1. Intenção
 
@@ -19,7 +19,7 @@ especificação exige comandos exatos, versões fixadas e saídas salvas.
 - `docs/PIPELINE.md` explica o pipeline e traz estimativas de tempo.
 
 **Não objetivos**
-- Corrigir a metodologia dos experimentos. O vazamento treino/teste do Gustavo é **reproduzido e reportado**, não corrigido.
+- Corrigir a metodologia dos experimentos. O vazamento treino/teste do Gustavo já foi corrigido por ele; o controlador reproduz a versão corrigida e confere que a sobreposição é zero.
 - Unificar as métricas dos três trabalhos numa só tabela.
 - Tornar o Colab ou o PowerShell parte do fluxo.
 
@@ -35,11 +35,11 @@ Davi usou Colab T4 com outra versão do torch. Por isso há três níveis de ver
 
 | Nível | O que verifica | Critério |
 |---|---|---|
-| Insumos | SHA-256 de datasets e benchmarks; contagens das transformações do Davi (1.729 trocas; 1.261 linhas, 1.413 PERSON e 54 LOCATION) | Igualdade exata |
+| Insumos | SHA-256 de datasets e benchmarks; contagens das transformações do Davi (1.729 trocas; 1.261 linhas, 1.413 PERSON e 54 LOCATION); no Gustavo, 248 prompts de teste, 995 de treino e 0 de sobreposição | Igualdade exata |
 | Métricas | Cada métrica de cada run contra o baseline | `|novo − baseline| ≤ max(piso, 2·dp das seeds)` |
 | Conclusões | Afirmações do relatório, como `synth_helpful < synth_control` nas 3 seeds e todos os fine-tunes abaixo do base | Verdadeiro ou falso |
 
-Pisos, em pontos percentuais: logprob 10; amostrado 5; semântico 5; CIMemories 10; CSQA 2.
+Pisos, em pontos percentuais: logprob 10; amostrado 5; semântico 5; CIMemories 10; CSQA 2; `degraded_%` do Gustavo 5.
 Os valores são escolha do design, baseados nos desvios observados e no limite de ~10 pontos do CIMemories citado no resumo de resultados.
 
 Vereditos: `OK`, `FORA_DA_TOLERANCIA`, `SEM_BASELINE`, `NAO_EXECUTADO`. Nenhum resultado sem comparação conta como `OK`.
@@ -50,7 +50,7 @@ Vereditos: `OK`, `FORA_DA_TOLERANCIA`, `SEM_BASELINE`, `NAO_EXECUTADO`. Nenhum r
 |---|---|---|
 | `rk` | Modelo base + 11 datasets × 3 seeds: LoRA, PrivacyLens, CSQA, CIMemories, juiz e PL semântico, tabela final | `results/` do Drive |
 | `davi` | Gera `nopii` e `role_swap_v2`; 3 fine-tunes (`degraded`, `nopii_ft`, `role_swap_ft_v2`, seed 0); PrivacyLens nos 3; CSQA nos 3 e no base (`untuned`); logit lens | `eval_results/` do Drive; logit lens sem baseline |
-| `gustavo` | Pares DPO, 2 treinos DPO, 3 condições ICL, avaliação com juiz (`LIMIT=None`) | `summary.csv`, quando chegar |
+| `gustavo` | Pares DPO derivados dos dois datasets (sem gerar texto), 2 treinos DPO, 3 condições ICL com os 3 exemplos de `out2/icl/`, avaliação de 6 condições com juiz `qwen3:8b` via Ollama (`LIMIT=None`) | `Gustavo/out/eval/summary.csv` do Drive (a pasta no Drive se chama `out`; o código grava em `out2`) |
 
 Fica de fora, por não ter resultado preliminar: `role_swap_ft` v1, run `teste`, `cand_*`,
 `_q15__base_v1_sem_schema`, `privacy_refine.py` e juiz/CIMemories do Davi. O trabalho incompleto do Davi é ignorado por decisão do usuário.
@@ -81,7 +81,7 @@ Se uma etapa falhar, o bloco é interrompido, os demais continuam e o relatório
 
 Antes de instalar ou baixar algo grande, o controlador mostra um relatório do computador e pede confirmação:
 
-- **Bloqueios** (impedem o bloco): falta Python 3.12 obtenível, falta Ollama para o Gustavo, disco insuficiente, Drive ou Hugging Face inacessíveis.
+- **Bloqueios** (impedem o bloco): falta Python 3.12 obtenível, falta Ollama ou o modelo `qwen3:8b` para o juiz do Gustavo, disco insuficiente, Drive ou Hugging Face inacessíveis. Cada bloqueio diz o que instalar e como; o controlador nunca instala Ollama nem modelos do Ollama por conta própria.
 - **Avisos** (permitem continuar): sem CUDA, com aviso de que resultados em MPS/CPU têm desvios e de que o caminho CUDA não foi testado no Mac; quantização em 4 bits indisponível; pouca memória; arquivos do Gustavo ausentes, com `SEM_BASELINE`.
 - **Para cada problema:** o que acontece e como resolver, com o comando quando houver.
 - **Plano:** blocos que rodarão ou serão pulados, tempo estimado por bloco para a máquina atual e espaço em disco necessário contra o disponível.
@@ -108,7 +108,7 @@ Todos passam a ler dispositivo e caminhos do controlador, mantendo os valores at
 
 - **Rubens/Kayque:** `common.py` com caminhos configuráveis; `device_map`, `torch.cuda.*` e geradores fixos em CUDA passam a seguir o dispositivo; orçamento de memória por dispositivo; `run_judge.py` sem caminho do Windows.
 - **Davi:** o `assert` de CUDA vira detecção; `GradScaler` e `autocast` por dispositivo; `torch.cuda.*` protegidos; caminhos passados por argumento; `logit_lens.py` recebe caminhos de entrada e saída por argumento.
-- **Gustavo:** quantização em 4 bits só com CUDA; `bf16` condicional; `LIMIT` por argumento (padrão: tudo); caminhos configuráveis; seed passada ao Ollama; opção de reaproveitar pares do Drive.
+- **Gustavo:** quantização em 4 bits só com CUDA; `bf16` condicional; `LIMIT` por argumento (padrão: tudo); caminhos configuráveis (padrão `out2`); `ICL_FILES` reativado por configuração, pois o `Tester.py` versionado o deixa vazio, embora o baseline inclua as 3 condições de ICL. A constante `K = 10` do `ICL.py` não é usada; o número efetivo de exemplos é `K_ICL = 3` do `run_all.py`, e o relatório registra isso.
 
 Hiperparâmetros, prompts e métricas não mudam. Cada desvio forçado pelo dispositivo fica registrado nos metadados e no relatório.
 
@@ -133,20 +133,20 @@ outputs/rk/ davi/ gustavo/   resultados completos de cada experimento
 | PrivacyLens | Hugging Face `SALT-NLP/PrivacyLens` | Disponível; revisão a fixar |
 | Qwen2.5-1.5B-Instruct, 0.5B, 0.5B-Instruct, Qwen3-8B Q4_K_M | Hugging Face | Disponíveis; revisões a fixar |
 | llama.cpp b11505 | GitHub | Há builds para macOS, Linux e Windows |
-| Ollama + `llama3.2:3b` + `qwen3:8b` | Instalação local | **Falta nesta máquina**; o preflight orienta |
+| Ollama + `qwen3:8b` (juiz do Gustavo) | Instalação local | Necessário só para o bloco `gustavo`; o preflight avisa e orienta. `llama3.2:3b` não é mais usado desde `12bf671` |
 | `train_meta.json` das 33 runs | Drive | OK |
-| Pares DPO, `test.jsonl`, `summary.csv` do Gustavo | Drive | **Pendente**; o controlador baixa assim que aparecerem e aceita qualquer estrutura de subpastas |
+| Pares DPO, `test.jsonl`, shots, `judged_*.jsonl` e `summary.csv` do Gustavo | Drive, `Gustavo/out/` | OK em 06/11/2026: 6 condições × 248 prompts, prompts iguais aos do `test.jsonl` |
 | `dataset_nopii_ft`, `dataset_role_swap_ft_v2` | Gerados | Não estão no Drive; regenerados e conferidos pelas contagens dos logs |
 
-Sem os arquivos do Gustavo o bloco ainda roda: gera os pares localmente com seed e marca `SEM_BASELINE`.
+Sem os arquivos do Gustavo o bloco ainda roda: gera os pares localmente com seed e marca `SEM_BASELINE`. Os arquivos antigos no Drive (`Gustavo/icl_*.jsonl` na raiz, `out_collapse/`, `out_smoke/`) são do teste com vazamento e são ignorados.
 
 ## 10. Restrições e riscos
 
-- **Testes nesta máquina:** o Mac M4 de 16 GB permite testar `--smoke` em MPS e CPU. **O caminho CUDA não pode ser testado aqui** e precisa de um `--smoke` na máquina com NVIDIA.
+- **Testes nesta máquina:** por decisão do usuário, no Mac de desenvolvimento só rodam testes unitários com dados falsos, `--check` e `--report-only`. Nenhum ambiente é criado, nenhum modelo é baixado e o Ollama não é instalado. **O `--smoke` e o caminho de GPU ficam sem teste** até uma execução na máquina com a RTX 4060, e o README diz isso.
 - **Desvio obrigatório em MPS/CPU:** o Gustavo roda sem quantização em 4 bits, pois `bitsandbytes` depende de CUDA na prática. O relatório registra isso.
 - **Disco:** cerca de 22 GB de modelos, ambientes e adapters, com 28 GB livres nesta máquina. O preflight exige folga e avisa antes de iniciar.
 - **Versões:** o baseline do Davi usou torch 2.11 sem versões fixadas; o do Rubens/Kayque, torch 2.9.1 e `transformers` 5.19. O controlador usa o lock de Rubens/Kayque. Presidio/spaCy e `trl` podem exigir ambientes próprios; isso será definido na implementação.
-- **Gustavo:** não há registro das versões usadas. O modelo das contrapartes segue o código (`llama3.2:3b`) até confirmação em contrário.
+- **Gustavo:** não há registro das versões usadas. O juiz é `qwen3:8b` no Ollama, com `temperature 0`, mas sem versão fixada do Ollama; isso é registrado como fonte de variação.
 - **Drive:** a reprodução depende de o link continuar público; as métricas ficam também em `reproduce/baselines/`.
 
 ## 11. Estimativas de tempo
@@ -155,18 +155,25 @@ Sem os arquivos do Gustavo o bloco ainda roda: gera os pares localmente com seed
 |---|---|---|
 | `rk` | 21–22 h (16,9 h + 4–5 h de juiz) | Medido no `ledger.jsonl` e no relatório |
 | `davi` | ~50 min (T4) | Medido: treino ~6 min por run; PrivacyLens ~10 min; CSQA ~25 s |
-| `gustavo` | 12–25 h | **Estimativa grosseira, sem medição**; pares reaproveitados poupam 6–10 h |
+| `gustavo` | 4–10 h | **Estimativa grosseira, sem medição**; desde `12bf671` os pares não exigem geração, então o custo é treino DPO, ICL e juiz |
 
-MPS e CPU não têm medição. Na implementação, um teste curto medirá o fator nesta máquina, e o `--check` usará o fator
-da máquina atual. O `PIPELINE.md` indicará claramente o que é medido e o que é estimado.
+MPS e CPU não têm medição e aparecem como "desconhecido" no `--check`, já que nada pesado roda na máquina de desenvolvimento. O `PIPELINE.md` indica claramente o que é medido e o que é estimado.
 
 ## 12. Critérios de aceitação
 
 - `--report-only` com os resultados preliminares reproduz os valores de `summary_original.md`.
 - `--check` lista corretamente o que falta e não executa nada; sem confirmação, nenhuma etapa pesada começa.
-- `--smoke` completa os 3 blocos no Mac, exceto o que depender de Ollama ausente, que é reportado.
+- `--smoke` existe e é documentado, mas não é executado na máquina de desenvolvimento; o README o indica como primeiro passo na máquina com GPU.
 - Interromper e retomar não refaz etapas concluídas.
 - Nada é commitado na `main`.
+- Requisitos do professor:
+  - `README.md` na raiz com resumo do projeto, instalação e os comandos exatos para reproduzir os resultados principais;
+  - dependências com versões fixadas (`requirements*.txt`);
+  - código-fonte e configurações versionados;
+  - saídas, logs ou resultados intermediários suficientes para sustentar os números quando a reprodução completa é cara: métricas por run em `reproduce/baselines/` e os resumos e julgamentos item a item que couberem no limite;
+  - repositório abaixo de 100 MB, sem datasets, pesos ou artefatos grandes; esses ficam no Drive e no Hugging Face, com script de download e localização documentada;
+  - nenhum segredo versionado; variáveis de ambiente (`HF_TOKEN` opcional, `HF_HOME`, `OLLAMA_HOST`) documentadas no README e lidas em tempo de execução;
+  - os dados usados são públicos, então não há dado restrito; se o Drive sair do ar, o README indica de onde vem cada insumo.
 
 ## 13. Decidido pelo usuário e deixado ao implementador
 
