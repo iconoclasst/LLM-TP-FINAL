@@ -97,17 +97,55 @@ def davi_counts(data_dir: Path) -> dict | None:
     return got
 
 
-def overall_verdict(rows, claims, ledger, smoke, counts=None) -> str:
+GUSTAVO_EXPECTED = {"gustavo: prompts de teste": 248, "gustavo: prompts únicos de treino DPO": 995,
+                    "gustavo: teste presente no treino": 0, "gustavo: teste presente nos exemplos do ICL": 0,
+                    "gustavo: respostas sem veredito do juiz": 0}
+
+
+def gustavo_invalid(out_dir: Path) -> int | None:
+    for sub in ("eval", "eval_smoke"):
+        p = Path(out_dir) / sub / "summary.csv"
+        if p.exists():
+            with open(p, encoding="utf-8", newline="") as f:
+                return sum(int(float(r.get("invalid") or 0)) for r in csv.DictReader(f))
+    return None
+
+
+def exact_checks(sources: dict, blocks, smoke: bool) -> list[dict]:
+    """Verificações de igualdade exata da spec (nível Insumos). Em --smoke, os tamanhos não se aplicam."""
+    out = []
+    if "davi" in blocks:
+        counts = davi_counts(sources["davi_data"]) if sources.get("davi_data") else None
+        for k, exp in DAVI_EXPECTED.items():
+            out.append({"block": "davi", "name": k, "got": None if counts is None else counts.get(k), "expected": exp})
+    if "gustavo" in blocks and sources.get("gustavo"):
+        o = gustavo_overlap(sources["gustavo"])
+        got = {"gustavo: prompts de teste": o and o["test"],
+               "gustavo: prompts únicos de treino DPO": o and (o["train"] or None),
+               "gustavo: teste presente no treino": o and (o["test_in_train"] if o["train"] else None),
+               "gustavo: teste presente nos exemplos do ICL": o and o["test_in_shots"],
+               "gustavo: respostas sem veredito do juiz": gustavo_invalid(sources["gustavo"])}
+        for k, exp in GUSTAVO_EXPECTED.items():
+            if smoke and exp != 0:
+                continue
+            out.append({"block": "gustavo", "name": k, "got": got[k], "expected": exp})
+    for c in out:
+        c["verdict"] = compare.NOT_RUN if c["got"] is None else compare.OK if c["got"] == c["expected"] else compare.OUT
+    return out
+
+
+def overall_verdict(rows, claims, ledger, smoke, checks=()) -> str:
+    if any(c["verdict"] == compare.OUT for c in checks if c["expected"] == 0 and "teste presente" in c["name"]):
+        return "NAO_REPRODUZIDO"   # vazamento treino/teste invalida até um --smoke
     if smoke:
         return "SMOKE"
     failed = any(s.get("returncode") not in (0, None) or s.get("status") in ("falhou", "interrompido", "nao_executado")
                  for s in ledger)
-    counts_bad = counts is not None and any(v is not None and v != DAVI_EXPECTED[k] for k, v in counts.items())
-    counts_missing = counts is None or any(v is None for v in counts.values())
-    if any(r["verdict"] == compare.OUT for r in rows) or any(c["holds"] is False for c in claims) or counts_bad:
+    if (any(r["verdict"] == compare.OUT for r in rows) or any(c["holds"] is False for c in claims)
+            or any(c["verdict"] == compare.OUT for c in checks)):
         return "NAO_REPRODUZIDO"
     if (rows and all(r["verdict"] == compare.OK for r in rows) and all(c["holds"] for c in claims) and not failed
-            and not counts_missing):
+            and all(c["verdict"] == compare.OK for c in checks)):
         return "REPRODUZIDO"
     return "PARCIAL"
 
@@ -125,55 +163,50 @@ def _block_verdict(rows):
 
 
 OVERALL_TEXT = {
-    "REPRODUZIDO": "todas as métricas ficaram dentro da tolerância e todas as conclusões se mantiveram.",
+    "REPRODUZIDO": "todas as métricas ficaram dentro da tolerância, todas as conclusões se mantiveram e as "
+                   "verificações exatas bateram.",
     "PARCIAL": "nada ficou fora da tolerância, mas há métricas não executadas ou sem baseline, ou etapas que falharam.",
-    "NAO_REPRODUZIDO": "há métricas fora da tolerância ou conclusões que não se mantiveram.",
+    "NAO_REPRODUZIDO": "há métricas fora da tolerância, conclusões que não se mantiveram ou verificações exatas "
+                       "que não bateram.",
     "SMOKE": "execução de teste (`--smoke`) com poucos itens: não é comparada com os resultados preliminares.",
 }
 
 
-def render_markdown(rows, claims, overlap, overall, env, ledger, deviations, counts=None) -> str:
+def render_markdown(rows, claims, overall, env, ledger, deviations, checks=(), blocks=BLOCKS) -> str:
     L = ["# Relatório de reprodução", "", f"Veredito geral: **{overall}**: {OVERALL_TEXT[overall]}", ""]
+    if tuple(blocks) != BLOCKS:
+        L += [f"Blocos pedidos: {', '.join(blocks)}. Os demais não fazem parte deste veredito.", ""]
     L += ["Tolerância por métrica: `|novo − baseline| ≤ max(piso, 2·dp das seeds do baseline)`. "
           "Pisos (pontos percentuais): " + ", ".join(f"{compare.METRIC_NAMES[k]} {v:g}"
                                                      for k, v in compare.FLOORS.items()) + ".", ""]
     L += ["## Resumo por bloco", "", "| Bloco | Veredito | Linhas comparadas |", "|---|---|---|"]
     for b in BLOCKS:
         br = [r for r in rows if r["block"] == b]
-        L.append(f"| {BLOCK_TITLES[b]} | {_block_verdict(br)} | {len(br)} |")
+        L.append(f"| {BLOCK_TITLES[b]} | {_block_verdict(br) if b in blocks else 'não pedido'} | {len(br)} |")
     L += ["", "## Conclusões dos relatórios", "", "| Bloco | Afirmação | Se mantém? |", "|---|---|---|"]
     word = {True: "sim", False: "**não**", None: "não verificável (faltam dados)"}
     for c in claims:
         L.append(f"| {c['block']} | {c['text']} | {word[c['holds']]} |")
-    L += ["", "## Vazamento treino/teste no Gustavo", ""]
-    if overlap is None:
-        L.append("Não verificado: `test.jsonl` ausente.")
-    elif overlap["train"] == 0:
-        L.append(f"Não verificável: há {overlap['test']} prompts de teste, mas nenhum par de treino DPO para comparar.")
+    L += ["", "## Verificações exatas (insumos, divisão treino/teste e juiz)", ""]
+    if checks:
+        L += ["| Verificação | Obtido | Esperado | Veredito |", "|---|---|---|---|"]
+        for c in checks:
+            L.append(f"| {c['name']} | {'—' if c['got'] is None else c['got']} | {c['expected']} | {c['verdict']} |")
     else:
-        L.append(f"{overlap['test_in_train']} de {overlap['test']} prompts de teste aparecem no treino DPO "
-                 f"({overlap['train']} prompts únicos de treino); {overlap['test_in_shots']} aparecem nos "
-                 "exemplos do ICL. O esperado é 0 nos dois casos.")
-    L += ["", "## Insumos gerados pelo Davi (igualdade exata)", ""]
-    if counts is None:
-        L.append("Não verificado: logs das transformações ausentes.")
-    else:
-        L += ["| Contagem | Obtido | Esperado | Veredito |", "|---|---|---|---|"]
-        for k, exp in DAVI_EXPECTED.items():
-            v = counts.get(k)
-            L.append(f"| {k} | {'—' if v is None else v} | {exp} | "
-                     f"{compare.NOT_RUN if v is None else compare.OK if v == exp else compare.OUT} |")
+        L.append("Nenhuma para os blocos pedidos.")
     L += ["", "## Desvios em relação aos experimentos originais", ""]
-    devs = list(deviations) + [
-        "Gustavo: a constante `K = 10` em `Gustavo/ICL.py` não é usada; o ICL usa os 3 exemplos "
-        "gravados por `run_all.py` (`K_ICL = 3`), como no resultado preliminar."]
-    L += [f"- {d}" for d in devs]
+    devs = list(deviations)
+    if "gustavo" in blocks:
+        devs.append("Gustavo: a constante `K = 10` em `Gustavo/ICL.py` não é usada; o ICL usa os 3 exemplos "
+                    "gravados por `run_all.py` (`K_ICL = 3`), como no resultado preliminar.")
+    L += [f"- {d}" for d in devs] or ["Nenhum."]
     L += ["", "## Ambiente", "", "```json", json.dumps(env, indent=2, ensure_ascii=False), "```"]
     if ledger:
-        L += ["", "## Etapas executadas", "", "| Bloco | Etapa | Duração (min) | Código de saída |", "|---|---|---|---|"]
+        L += ["", "## Etapas executadas", "", "| Bloco | Etapa | Situação | Duração (min) | Código de saída |",
+              "|---|---|---|---|---|"]
         for s in ledger:
-            L.append(f"| {s.get('block', '')} | {s.get('step', '')} | {_fmt((s.get('duration_s') or 0) / 60)} "
-                     f"| {s.get('returncode', '—')} |")
+            L.append(f"| {s.get('block', '')} | {s.get('step', '')} | {s.get('status', '')} "
+                     f"| {_fmt((s.get('duration_s') or 0) / 60)} | {s.get('returncode', '—')} |")
     for b in BLOCKS:
         br = [r for r in rows if r["block"] == b]
         if not br:
@@ -188,24 +221,25 @@ def render_markdown(rows, claims, overlap, overall, env, ledger, deviations, cou
 
 
 def build_and_write(sources: dict, out_dir: Path, env: dict, ledger: list, deviations: list,
-                    smoke: bool = False, baseline: dict | None = None) -> ReportResult:
+                    smoke: bool = False, baseline: dict | None = None, blocks=BLOCKS) -> ReportResult:
+    blocks = tuple(b for b in BLOCKS if b in blocks)
     baseline = baseline or {b: baselines.load_baseline(b) for b in BLOCKS}
-    new = extract(sources)
-    base_rows = [r for b in BLOCKS for r in baseline.get(b, [])]
+    new = [r for r in extract(sources) if r["block"] in blocks]
+    base_rows = [r for b in blocks for r in baseline.get(b, [])]
     if smoke:
         rows = [{"block": r["block"], "run": r["run"], "metric": r["metric"], "new": r["value"],
                  "baseline": None, "tolerance": None, "verdict": "SMOKE"} for r in new]
-        claims = compare.check_claims([])
+        claims = []
     else:
         rows = compare.compare_rows(new, base_rows)
-        claims = compare.check_claims(new)
-    overlap = gustavo_overlap(sources["gustavo"]) if sources.get("gustavo") else None
-    counts = davi_counts(sources["davi_data"]) if sources.get("davi_data") else None
-    overall = overall_verdict(rows, claims, ledger, smoke, counts)
+        claims = [c for c in compare.check_claims(new) if c["block"] in blocks]
+    checks = exact_checks(sources, blocks, smoke)
+    overlap = gustavo_overlap(sources["gustavo"]) if "gustavo" in blocks and sources.get("gustavo") else None
+    overall = overall_verdict(rows, claims, ledger, smoke, checks)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     md = out_dir / "REPRODUCAO.md"
-    md.write_text(render_markdown(rows, claims, overlap, overall, env, ledger, deviations, counts), encoding="utf-8")
+    md.write_text(render_markdown(rows, claims, overall, env, ledger, deviations, checks, blocks), encoding="utf-8")
     with open(out_dir / "comparison.csv", "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["block", "run", "metric", "new", "baseline", "tolerance", "verdict"],
                            lineterminator="\n")

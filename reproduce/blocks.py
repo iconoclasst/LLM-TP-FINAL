@@ -46,18 +46,24 @@ class Context:
         return self.art / "rk" / "benchmarks" / "privacylens" / "data" / "main_data.json"
 
     def common_env(self) -> dict:
-        return {"REPRO_DEVICE": self.device, "HF_HOME": str(self.hf_home), "TOKENIZERS_PARALLELISM": "false"}
+        # Depois de `insumos_hf`, tudo roda offline: assim os scripts, que carregam a revisão `main`,
+        # usam a revisão fixada que hf_snapshot gravou em refs/main.
+        return {"REPRO_DEVICE": self.device, "HF_HOME": str(self.hf_home), "TOKENIZERS_PARALLELISM": "false",
+                "HF_HUB_OFFLINE": "1", "HF_DATASETS_OFFLINE": "1"}
 
 
-def _hf_step(block, ctx, models, privacylens=False, gguf=False):
+def _hf_step(block, ctx, models, privacylens=False, gguf=False, csqa=False):
     args = ["-m", "reproduce.steps.hf_snapshot", "--models", *models]
+    if csqa:
+        args.append("--csqa")
     outputs = []
     if privacylens:
         args += ["--privacylens", ctx.privacylens]
         outputs.append(ctx.privacylens)
     if gguf:
         args.append("--gguf")
-    return Step(block, "insumos_hf", args, "main", outputs, extra_env=ctx.common_env(),
+    env = {**ctx.common_env(), "HF_HUB_OFFLINE": "0", "HF_DATASETS_OFFLINE": "0"}
+    return Step(block, "insumos_hf", args, "main", outputs, extra_env=env,
                 description="baixa modelos e dados do Hugging Face nas revisões fixadas")
 
 
@@ -87,7 +93,7 @@ def build_rk(ctx: Context) -> list[Step]:
                                  *ad, *cim_lim], [res / "cimemories" / "responses" / f"{run}.json"]),
         ]
 
-    steps = [_hf_step("rk", ctx, [BASE_MODEL], privacylens=True, gguf=True)]
+    steps = [_hf_step("rk", ctx, [BASE_MODEL], privacylens=True, gguf=True, csqa=True)]
     steps += evals("q15__base", None, ["0"] if ctx.smoke else ["0", "1", "2"])
     all_runs = ["q15__base"]
     for seed in seeds:
@@ -105,7 +111,8 @@ def build_rk(ctx: Context) -> list[Step]:
     steps.append(Step("rk", "juiz", ["-m", "reproduce.steps.rk_judge", "--llama-dir", ctx.art / "tools" / "llama.cpp"],
                       "main", [res / "cimemories" / f"{r}.json" for r in all_runs] +
                       [res / "privacylens_semantic" / f"{r}.json" for r in all_runs],
-                      cwd=RK_SCRIPTS, extra_env=env, description="juiz Qwen3-8B via llama-server"))
+                      cwd=RK_SCRIPTS, extra_env=env, description="juiz Qwen3-8B via llama-server",
+                      keep_partial=True))
     steps.append(S("tabela", ["make_report.py"], [res / "summary.md"]))
     return steps
 
@@ -120,7 +127,8 @@ def build_davi(ctx: Context) -> list[Step]:
     def S(name, args, outputs, py="main", cwd=out):
         return Step("davi", name, args, py, outputs, cwd=cwd, extra_env=env)
 
-    steps = [_hf_step("davi", ctx, [BASE_MODEL, "Qwen/Qwen2.5-0.5B", "Qwen/Qwen2.5-0.5B-Instruct"], privacylens=True)]
+    steps = [_hf_step("davi", ctx, [BASE_MODEL, "Qwen/Qwen2.5-0.5B", "Qwen/Qwen2.5-0.5B-Instruct"], privacylens=True,
+                      csqa=True)]
     steps.append(S("dados:role_swap_v2", [sol / "gen_datasets" / "gen_dataset_with_role_swap.py",
                                           GUSTAVO / "dataset_degraded_ft.jsonl", DAVI_RUNS["role_swap_ft_v2"],
                                           "--fraction", "0.6", "--seed", "42"],
@@ -172,12 +180,13 @@ def build_gustavo(ctx: Context) -> list[Step]:
         Step("gustavo", "dpo", [GUSTAVO / "run_all.py"], "main",
              [o2 / "test.jsonl", o2 / "dpo" / "dpo_collapse.jsonl", o2 / "dpo" / "dpo_control.jsonl",
               o2 / "models" / "collapse" / "adapter_config.json", o2 / "models" / "control" / "adapter_config.json"],
-             cwd=out, extra_env=env, description="pares DPO e 2 treinos DPO"),
+             cwd=out, extra_env=env, description="pares DPO e 2 treinos DPO", keep_partial=True),
         Step("gustavo", "icl", [GUSTAVO / "ICL.py"], "main",
              [out / f"icl_{c}.jsonl" for c in ("zero_shot", "icl_degrading", "icl_safe")],
              cwd=out, extra_env=env, description="3 condições de ICL"),
-        Step("gustavo", "juiz", [GUSTAVO / "Tester.py"], "main", [eval_dir / "summary.csv"], cwd=out,
-             extra_env=judge_env, description="avaliação das 6 condições com o juiz qwen3:8b no Ollama"),
+        Step("gustavo", "juiz", ["-m", "reproduce.steps.gustavo_judge", GUSTAVO / "Tester.py", eval_dir], "main",
+             [eval_dir / "summary.csv"], cwd=out, extra_env=judge_env, keep_partial=True,
+             description="avaliação das 6 condições com o juiz qwen3:8b no Ollama"),
     ]
 
 

@@ -81,7 +81,7 @@ Se uma etapa falhar, o bloco é interrompido, os demais continuam e o relatório
 
 Antes de instalar ou baixar algo grande, o controlador mostra um relatório do computador e pede confirmação:
 
-- **Bloqueios** (impedem o bloco): falta Python 3.12 obtenível, falta Ollama ou o modelo `qwen3:8b` para o juiz do Gustavo, disco insuficiente, Drive ou Hugging Face inacessíveis. Cada bloqueio diz o que instalar e como; o controlador nunca instala Ollama nem modelos do Ollama por conta própria.
+- **Bloqueios** (impedem o bloco): falta Python 3.12 obtenível, falta Ollama ou o modelo `qwen3:8b` para o juiz do Gustavo, disco insuficiente, Drive inacessível com insumos faltando, falta de Vulkan no Linux para o juiz do Rubens/Kayque. Hugging Face inacessível vira aviso, porque um cache já preenchido basta (as revisões fixadas ficam gravadas como `main` e as etapas rodam offline). Cada bloqueio diz o que instalar e como; o controlador nunca instala Ollama nem modelos do Ollama por conta própria.
 - **Avisos** (permitem continuar): sem CUDA, com aviso de que resultados em MPS/CPU têm desvios e de que o caminho CUDA não foi testado no Mac; quantização em 4 bits indisponível; pouca memória; arquivos do Gustavo ausentes, com `SEM_BASELINE`.
 - **Para cada problema:** o que acontece e como resolver, com o comando quando houver.
 - **Plano:** blocos que rodarão ou serão pulados, tempo estimado por bloco para a máquina atual e espaço em disco necessário contra o disponível.

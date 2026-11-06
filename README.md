@@ -31,7 +31,7 @@ O relatório final sai em `outputs/REPRODUCAO.md`, com veredito por métrica e p
 | `--check` | mostra requisitos, empecilhos, plano e estimativas; não executa nada |
 | `--only rk\|davi\|gustavo` | roda só um bloco (pode repetir) |
 | `--smoke` | poucos itens e passos, saída em `outputs/smoke/`; nunca compara com o baseline |
-| `--report-only` | só refaz a comparação e o relatório a partir de `outputs/` |
+| `--report-only` | só refaz a comparação e o relatório a partir de `outputs/` (com `--smoke`, de `outputs/smoke/`) |
 | `--report-only --preliminary` | compara os resultados preliminares versionados com os baselines (autoverificação, segundos, sem GPU) |
 | `--fresh` | move as saídas anteriores para uma pasta datada e refaz tudo |
 | `--yes` | não pede confirmação (execução sem supervisão) |
@@ -102,8 +102,8 @@ verificação de SHA-256:
 | Datasets de fine-tuning do Rubens/Kayque (11), CIMemories, prompts do logit lens | Google Drive público: <https://drive.google.com/drive/folders/1xeiQu2GcCBrb2AdD8SboZfQ3BiLRGrCw>; ids e hashes em `reproduce/manifest.tsv` |
 | PrivacyLens (`main_data.json`, 493 cenários) | Hugging Face `SALT-NLP/PrivacyLens`, revisão fixada |
 | Qwen2.5-1.5B-Instruct, Qwen2.5-0.5B(-Instruct), Qwen3-8B-GGUF | Hugging Face, revisões fixadas |
+| CommonSenseQA | Hugging Face `tau/commonsense_qa`, revisão fixada |
 | Datasets do Gustavo (`dataset_degraded_ft.jsonl`, `dataset_safe_ft.jsonl`) | neste repositório (`Gustavo/`), 1,8 MB |
-| CommonSenseQA | Hugging Face `tau/commonsense_qa`, baixado pelos scripts |
 
 Todos os dados são públicos; não há dado de acesso restrito.
 

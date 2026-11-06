@@ -26,6 +26,12 @@ def write_jsonl(path, rows):
 
 
 class OverlapTest(unittest.TestCase):
+    def setUp(self):
+        self.out = Path(tempfile.mkdtemp())
+
+    def build(self, sources):
+        return report.build_and_write(sources, self.out, env={}, ledger=[], deviations=[])
+
     def test_counts(self):
         d = Path(tempfile.mkdtemp())
         write_jsonl(d / "test.jsonl", [messages("p1"), messages("p2"), messages("p3")])
@@ -35,11 +41,38 @@ class OverlapTest(unittest.TestCase):
         o = report.gustavo_overlap(d)
         self.assertEqual(o, {"test": 3, "train": 3, "test_in_train": 1, "test_in_shots": 1})
 
-    def test_without_train_pairs_report_says_not_verifiable(self):
+    def test_without_train_pairs_leak_is_not_verified(self):
         d = Path(tempfile.mkdtemp())
         write_jsonl(d / "test.jsonl", [messages("p1")])
-        md = report.render_markdown([], [], report.gustavo_overlap(d), "PARCIAL", {}, [], [])
-        self.assertIn("Não verificável", md)
+        checks = {c["name"]: c for c in report.exact_checks({"gustavo": d}, ("gustavo",), smoke=False)}
+        self.assertEqual(checks["gustavo: teste presente no treino"]["verdict"], "NAO_EXECUTADO")
+        self.assertEqual(checks["gustavo: prompts de teste"]["verdict"], "FORA_DA_TOLERANCIA")
+
+    def test_leak_makes_not_reproduced_even_in_smoke(self):
+        d = Path(tempfile.mkdtemp())
+        write_jsonl(d / "test.jsonl", [messages("p1")])
+        write_jsonl(d / "dpo/dpo_control.jsonl", [pair("p1")])
+        res = report.build_and_write({"gustavo": d}, self.out, {}, [], [], smoke=True, blocks=("gustavo",))
+        self.assertEqual(res.overall, "NAO_REPRODUZIDO")
+
+    def test_judge_invalid_answers_fail(self):
+        src = report.preliminary_sources()
+        d = Path(tempfile.mkdtemp())
+        import shutil
+        shutil.copytree(src["gustavo"], d / "g")
+        p = d / "g/eval/summary.csv"
+        p.write_text(p.read_text(encoding="utf-8").replace("zero_shot,248,0,", "zero_shot,248,3,"), encoding="utf-8")
+        src["gustavo"] = d / "g"
+        res = self.build(src)
+        self.assertEqual(res.overall, "NAO_REPRODUZIDO")
+
+    def test_only_requested_blocks_are_judged(self):
+        src = report.preliminary_sources()
+        res = report.build_and_write(src, self.out, {}, [], [], blocks=("rk",))
+        self.assertEqual({r["block"] for r in res.rows}, {"rk"})
+        self.assertEqual({c["block"] for c in res.claims}, {"rk"})
+        self.assertEqual(res.overall, "REPRODUZIDO")
+        self.assertIn("não pedido", (self.out / "REPRODUCAO.md").read_text(encoding="utf-8"))
 
     def test_missing_files(self):
         self.assertIsNone(report.gustavo_overlap(Path(tempfile.mkdtemp())))
@@ -62,7 +95,8 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(res.overall, "REPRODUZIDO")
         md = (self.out / "REPRODUCAO.md").read_text(encoding="utf-8")
         self.assertIn("REPRODUZIDO", md)
-        self.assertIn("0 de 248 prompts de teste aparecem no treino DPO (995 prompts únicos", md)
+        self.assertIn("| gustavo: teste presente no treino | 0 | 0 | OK |", md)
+        self.assertIn("| gustavo: prompts únicos de treino DPO | 995 | 995 | OK |", md)
         with open(self.out / "comparison.csv", encoding="utf-8") as f:
             self.assertEqual(len(list(csv.DictReader(f))), len(res.rows))
 
@@ -118,6 +152,7 @@ class ReportTest(unittest.TestCase):
         res = self.build(report.preliminary_sources(), smoke=True)
         self.assertEqual(res.overall, "SMOKE")
         self.assertEqual({r["verdict"] for r in res.rows}, {"SMOKE"})
+        self.assertEqual(res.claims, [])
 
 
 if __name__ == "__main__":

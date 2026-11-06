@@ -1,8 +1,10 @@
 """Executa etapas como subprocessos, com retomada, log por etapa e ledger.jsonl.
 
 Uma etapa só conta como concluída com código de saída 0, todas as saídas declaradas
-existentes e o marcador `.done` gravado. Sem marcador, as saídas declaradas que forem
-arquivos são apagadas antes de rodar de novo (podem estar pela metade).
+existentes e o marcador `.done` gravado (com o dispositivo usado). Sem marcador, as saídas
+declaradas que forem arquivos são apagadas antes de rodar de novo, pois podem estar pela
+metade, exceto nas etapas `keep_partial`, cujos scripts retomam sozinhos e gravam cada
+saída de forma completa.
 """
 from __future__ import annotations
 
@@ -29,6 +31,7 @@ class Step:
     cwd: Path | None = None
     extra_env: dict = field(default_factory=dict)
     description: str = ""
+    keep_partial: bool = False   # o script pula o que já terminou; não apagar saídas na retomada
 
 
 @dataclass
@@ -54,8 +57,13 @@ def _write_ledger(ctx, rec: dict) -> None:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
-def _done(step: Step, marker: Path) -> bool:
-    return marker.exists() and all(Path(o).exists() for o in step.outputs)
+def _done(step: Step, marker: Path, device: str) -> bool:
+    if not marker.exists() or not all(Path(o).exists() for o in step.outputs):
+        return False
+    try:
+        return json.loads(marker.read_text(encoding="utf-8")).get("device") == device
+    except ValueError:
+        return False
 
 
 def run_step(step: Step, ctx, fresh: bool = False) -> StepResult:
@@ -64,15 +72,16 @@ def run_step(step: Step, ctx, fresh: bool = False) -> StepResult:
     log = ctx.out / "logs" / step.block / (marker_name(step)[:-5] + ".log")
     started = time.strftime("%Y-%m-%d %H:%M:%S")
     base = {"block": step.block, "step": step.name, "started": started}
-    if not fresh and _done(step, marker):
+    if not fresh and _done(step, marker, ctx.device):
         _write_ledger(ctx, {**base, "status": "pulado", "returncode": None, "duration_s": 0})
         return StepResult(step, "pulado", log=log)
     if marker.exists():
         marker.unlink()
     for o in step.outputs:
         o = Path(o)
-        if o.is_file():
+        if o.is_file() and not step.keep_partial:
             o.unlink()
+        o.parent.mkdir(parents=True, exist_ok=True)   # vários scripts não criam a pasta da saída
     cwd = Path(step.cwd) if step.cwd else REPO
     cwd.mkdir(parents=True, exist_ok=True)
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -102,7 +111,8 @@ def run_step(step: Step, ctx, fresh: bool = False) -> StepResult:
     status = "ok" if rc == 0 and not missing else "falhou"
     if status == "ok":
         markers.mkdir(parents=True, exist_ok=True)
-        marker.write_text(json.dumps({"finished": time.strftime("%Y-%m-%d %H:%M:%S")}), encoding="utf-8")
+        marker.write_text(json.dumps({"finished": time.strftime("%Y-%m-%d %H:%M:%S"), "device": ctx.device}),
+                          encoding="utf-8")
     rec = {**base, "status": status, "returncode": rc, "duration_s": dt, "cmd": cmd, "log": str(log)}
     if missing:
         rec["saidas_ausentes"] = missing

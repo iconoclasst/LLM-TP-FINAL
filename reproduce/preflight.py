@@ -43,6 +43,8 @@ class Facts:
     online_hf: bool = True
     artifacts_missing: int = 0
     envs_ready: list = field(default_factory=list)
+    vulkan: bool | None = None   # Linux: libvulkan presente? None = não se aplica ou não deu para verificar
+    llama_server_env: bool = False
 
 
 @dataclass
@@ -102,6 +104,13 @@ def _ollama_models():
         return True, []
 
 
+def _vulkan() -> bool | None:
+    if platform.system() != "Linux":
+        return None
+    out = _run(["ldconfig", "-p"]) or _run(["/sbin/ldconfig", "-p"])
+    return None if out is None else "libvulkan.so.1" in out
+
+
 def collect_facts(network: bool = True) -> Facts:
     from . import fetch
     sysname = platform.system()
@@ -119,7 +128,8 @@ def collect_facts(network: bool = True) -> Facts:
         ollama_models=models,
         online_drive=network and _head_ok("https://drive.google.com"),
         online_hf=network and _head_ok("https://huggingface.co"),
-        artifacts_missing=missing, envs_ready=ready)
+        artifacts_missing=missing, envs_ready=ready, vulkan=_vulkan(),
+        llama_server_env=bool(os.environ.get("LLAMA_SERVER")))
 
 
 def choose_device(f: Facts) -> str:
@@ -127,7 +137,8 @@ def choose_device(f: Facts) -> str:
 
 
 def has_ollama_model(f: Facts) -> bool:
-    return any(m == OLLAMA_MODEL or m.startswith(OLLAMA_MODEL + "-") for m in f.ollama_models)
+    # o Tester.py pede exatamente "qwen3:8b"; variantes como "qwen3:8b-q8_0" não servem
+    return OLLAMA_MODEL in f.ollama_models
 
 
 def assess(f: Facts, blocks, smoke: bool = False) -> list[Issue]:
@@ -146,8 +157,9 @@ def assess(f: Facts, blocks, smoke: bool = False) -> list[Issue]:
                        "Verifique a conexão; o link do Drive está no README."))
     if not f.online_hf:
         I.append(Issue("AVISO", "geral", "hf",
-                       "Sem acesso ao Hugging Face: só funciona se os modelos já estiverem no cache (HF_HOME).",
-                       "Verifique a conexão ou defina HF_HOME para um cache já preenchido."))
+                       "Sem acesso ao Hugging Face: só funciona se uma execução anterior já tiver baixado os modelos "
+                       "e dados fixados para o cache (HF_HOME).",
+                       "Verifique a conexão ou defina HF_HOME para um cache já preenchido pelo reproduce.py."))
     need = estimates.disk_needed_gb(blocks, has_ollama_model(f))
     if f.disk_free_gb < need:
         I.append(Issue("BLOQUEIO", "geral", "disco",
@@ -172,6 +184,12 @@ def assess(f: Facts, blocks, smoke: bool = False) -> list[Issue]:
     if f.os == "Windows":
         I.append(Issue("AVISO", "geral", "windows", "Windows não foi testado com este controlador.",
                        "Se algo falhar, use WSL2 ou Linux."))
+    if "rk" in blocks and f.vulkan is False and not f.llama_server_env:
+        I.append(Issue("BLOQUEIO", "rk", "sem_vulkan",
+                       "O juiz do Rubens/Kayque usa o llama.cpp b11505 com Vulkan, mas libvulkan.so.1 não foi "
+                       "encontrada. Sem ela, o juiz falharia depois de ~17 h de treino.",
+                       "Instale o Vulkan e o ICD da NVIDIA (ex.: `sudo apt install libvulkan1` e o driver NVIDIA "
+                       "completo) ou defina LLAMA_SERVER com um llama-server b11505 compilado com CUDA."))
     if "gustavo" in blocks:
         install = (f"Instale o Ollama (https://ollama.com/download), deixe-o aberto (ou rode `ollama serve`) e "
                    f"baixe o juiz: `ollama pull {OLLAMA_MODEL}` (cerca de 5,2 GB). O controlador não instala o "

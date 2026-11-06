@@ -23,7 +23,8 @@ def parse_args(argv=None):
                     help="roda só este bloco (pode repetir)")
     ap.add_argument("--smoke", action="store_true",
                     help="poucos itens e passos, para testar o pipeline; nunca compara com o baseline")
-    ap.add_argument("--report-only", action="store_true", help="só refaz a comparação e o relatório")
+    ap.add_argument("--report-only", action="store_true",
+                    help="só refaz a comparação e o relatório (com --smoke: o de outputs/smoke/)")
     ap.add_argument("--preliminary", action="store_true",
                     help="com --report-only: compara os resultados preliminares versionados com os baselines "
                          "(autoverificação; grava em outputs/preliminar/)")
@@ -37,9 +38,16 @@ def parse_args(argv=None):
 
 
 def read_ledger(path: Path) -> list[dict]:
+    """Só a tentativa mais recente de cada etapa: falhas antigas já retomadas não contam."""
     if not path.exists():
         return []
-    return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    latest = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            rec = json.loads(line)
+            latest.pop((rec.get("block"), rec.get("step")), None)   # mantém a ordem da última execução
+            latest[(rec.get("block"), rec.get("step"))] = rec
+    return list(latest.values())
 
 
 def report_only(args) -> int:
@@ -48,13 +56,17 @@ def report_only(args) -> int:
                                      env={"fonte": "resultados_preliminares/ (versionados)"}, ledger=[],
                                      deviations=[])
     else:
-        env_p = OUTPUTS / "environment.json"
+        out = OUTPUTS / "smoke" if args.smoke else OUTPUTS
+        env_p = out / "environment.json"
         env = json.loads(env_p.read_text(encoding="utf-8")) if env_p.exists() else {}
-        meta_p = OUTPUTS / "run_meta.json"
+        env.pop("pacotes", None)
+        meta_p = out / "run_meta.json"
         meta = json.loads(meta_p.read_text(encoding="utf-8")) if meta_p.exists() else {}
-        res = report.build_and_write(report.output_sources(OUTPUTS), OUTPUTS, env=env,
-                                     ledger=read_ledger(OUTPUTS / "ledger.jsonl"),
-                                     deviations=meta.get("deviations", []), smoke=meta.get("smoke", False))
+        blocks = tuple(args.only) if args.only else tuple(meta.get("blocos") or BLOCKS)
+        res = report.build_and_write(report.output_sources(out), out, env=env,
+                                     ledger=read_ledger(out / "ledger.jsonl"),
+                                     deviations=meta.get("deviations", []), smoke=args.smoke or meta.get("smoke", False),
+                                     blocks=blocks)
     print(f"Veredito geral: {res.overall}")
     print(f"Relatório: {res.path}")
     return 0 if res.overall in ("REPRODUZIDO", "SMOKE") else 1

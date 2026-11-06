@@ -23,7 +23,9 @@ def deviations(device: str, run_blocks) -> list[str]:
     if "rk" in run_blocks:
         d.append("Rubens/Kayque: a seed 0 original foi treinada em AMD (ROCm) e as seeds 1–2 em NVIDIA; "
                  "o torch aqui é o 2.9.1 do lock" + ("" if device == "cuda" else
-                 "; o juiz usa o llama.cpp b11505 nativo da plataforma, não o build Vulkan do Windows") + ".")
+                 "; o juiz usa o llama.cpp b11505 nativo da plataforma, não o build Vulkan do Windows") +
+                 ("; treino e avaliação mantêm bf16, como no original, o que em CPU é lento" if device == "cpu" else "")
+                 + ".")
     if "davi" in run_blocks:
         d.append("Davi: o baseline foi obtido no Colab (T4) com torch 2.11 sem versões fixadas; aqui se usa "
                  "o lock do Rubens/Kayque (torch 2.9.1, transformers 5.19.0).")
@@ -88,6 +90,9 @@ def run(args, *, collect=preflight.collect_facts, interactive=None, input_fn=inp
     device = preflight.choose_device(facts)
     try:
         py = envs.find_python312()
+        if py is None and not all((envs.ENVS / n / ".pronto").exists() for n in (["main", "pii"] if "davi" in to_run
+                                                                                     else ["main"])):
+            raise envs.EnvError("não há Python 3.12, uv nem conda para criar os ambientes que faltam")
         pythons = {"main": ensure_env("main", device, py)}
         if "davi" in to_run:
             pythons["pii"] = ensure_env("pii", device, py)
@@ -126,6 +131,6 @@ def run(args, *, collect=preflight.collect_facts, interactive=None, input_fn=inp
     env = json.loads((ctx.out / "environment.json").read_text(encoding="utf-8"))
     env.pop("pacotes", None)   # a lista completa fica em environment.json
     out = report.build_and_write(report.output_sources(ctx.out), ctx.out, env=env, ledger=ledger,
-                                 deviations=devs, smoke=args.smoke)
+                                 deviations=devs, smoke=args.smoke, blocks=to_run)
     print(f"\nVeredito geral: {out.overall}\nRelatório: {out.path}")
     return 0 if out.overall in ("REPRODUZIDO", "SMOKE") and all(r.status in ("ok", "pulado") for r in results) else 1

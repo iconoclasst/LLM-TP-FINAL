@@ -129,8 +129,10 @@ def sysinfo() -> dict:
 def save_json(obj, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    tmp = path.with_name(path.name + ".tmp")   # grava e renomeia: um arquivo interrompido nunca fica pela metade
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, path)
 
 
 def load_model(base_model: str, adapter: str | None = None, dtype="bfloat16"):

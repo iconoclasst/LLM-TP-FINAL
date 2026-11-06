@@ -24,8 +24,14 @@ Bloqueios gerais (disco, Python 3.12, Drive) impedem tudo. Um bloqueio de bloco,
 ausente, só pula aquele bloco; os outros podem rodar se você confirmar.
 
 **Retomada.** Uma etapa só conta como concluída com código de saída 0, todas as saídas declaradas
-presentes e o marcador `outputs/.done/<etapa>.done`. Ao rodar de novo, as etapas concluídas são
-puladas. Uma etapa interrompida perde as saídas parciais e roda do início.
+presentes e o marcador `outputs/.done/<etapa>.done`, que registra o dispositivo usado. Ao rodar de
+novo no mesmo dispositivo, as etapas concluídas são puladas. Uma etapa interrompida perde as saídas
+parciais e roda do início. As exceções são as etapas longas que retomam sozinhas: o juiz do
+Rubens/Kayque, o DPO e o juiz do Gustavo. Nelas, o que já terminou é mantido.
+
+**Revisões fixadas.** A etapa `insumos_hf` baixa cada modelo e dataset do Hugging Face na revisão de
+`reproduce/pins.toml` e grava essa revisão como `main` no cache. As etapas seguintes rodam com
+`HF_HUB_OFFLINE=1`, de modo que os scripts, que pedem `main`, carregam exatamente a revisão fixada.
 
 **Falhas.** Uma falha interrompe o restante do bloco, mas os outros blocos continuam. O relatório
 marca como `NAO_EXECUTADO` tudo o que não rodou.
@@ -75,7 +81,9 @@ Rodado em `outputs/gustavo/`, com `REPRO_OUT_DIR=outputs/gustavo/out2`:
 | `icl` | `ICL.py`: 3 condições (`zero_shot`, `icl_degrading`, `icl_safe`), com os 3 exemplos de `out2/icl/` | `icl_*.jsonl` |
 | `juiz` | `Tester.py` com `REPRO_ICL=1` e `LIMIT=None`: 6 condições julgadas pelo `qwen3:8b` no Ollama | `out2/eval/summary.csv` e `judged_*.jsonl` |
 
-A constante `K = 10` do `ICL.py` não é usada. O número efetivo de exemplos é `K_ICL = 3`, igual ao
+O juiz roda pelo `reproduce.steps.gustavo_judge`, que falha se alguma resposta ficar sem veredito,
+por exemplo com o Ollama parado. Na próxima execução, só as condições com problema são julgadas de
+novo. A constante `K = 10` do `ICL.py` não é usada. O número efetivo de exemplos é `K_ICL = 3`, igual ao
 do resultado preliminar.
 
 ## 3. Critérios de verificação
@@ -85,7 +93,8 @@ do resultado preliminar.
 | Insumos | SHA-256 dos arquivos do Drive, do PrivacyLens, do GGUF e do llama.cpp | igualdade exata; hash divergente bloqueia o uso |
 | Métricas | cada métrica de cada run contra `reproduce/baselines/` | `|novo − baseline| ≤ max(piso, 2·dp das seeds do baseline)` |
 | Conclusões | afirmações dos relatórios (tabela em `REPRODUCAO.md`) | verdadeiro ou falso |
-| Vazamento (Gustavo) | prompts de teste presentes no treino DPO ou nos exemplos do ICL | 0 |
+| Gustavo | 248 prompts de teste, 995 de treino, 0 de sobreposição com o treino e com os exemplos do ICL, 0 respostas sem veredito | igualdade exata; vazamento reprova até um `--smoke` |
+| Davi | contagens dos `logs.txt` das transformações | igualdade exata |
 
 Pisos, em pontos percentuais: PrivacyLens logprob 10, PrivacyLens amostrado 5, PL semântico 5,
 CIMemories 10, CSQA 2, respostas degradantes (Gustavo) 5. Os pisos se baseiam nos desvios observados
@@ -99,6 +108,8 @@ Nada que não tenha sido comparado conta como `OK`.
 - `PARCIAL`: nada fora da tolerância, mas algo não rodou ou não tinha baseline;
 - `NAO_REPRODUZIDO`: alguma métrica fora da tolerância ou alguma conclusão invertida;
 - `SMOKE`: execução `--smoke`, que não é comparada.
+
+Com `--only`, o veredito considera apenas os blocos pedidos; os demais aparecem como "não pedido".
 
 ## 4. Tempo e disco
 
@@ -150,6 +161,8 @@ fora da CUDA ou quando as variáveis `REPRO_*` estão definidas.
 | `Espaço livre insuficiente` | libere espaço, use `--only`, ou aponte `REPRO_ARTIFACTS`/`HF_HOME`/`REPRO_ENVS` para outro disco |
 | Insumo `corrompido` | o arquivo no Drive mudou; não é usado. Avise quem mantém o repositório para atualizar o `manifest.tsv` |
 | Etapa `falhou` | veja o log indicado (`outputs/logs/<bloco>/<etapa>.log`); corrija e rode o mesmo comando para retomar |
+| `BLOQUEIO (rk) ... libvulkan` (Linux) | o llama.cpp fixado é o build Vulkan: instale `libvulkan1` e o driver NVIDIA completo, ou defina `LLAMA_SERVER` com um llama-server b11505 compilado com CUDA |
+| Etapa `juiz` do Gustavo falhou com "respostas sem veredito" | o Ollama parou ou o modelo não é exatamente `qwen3:8b`; corrija e rode de novo |
 | Falta de memória na GPU | feche outros processos; o juiz do Rubens/Kayque usa ~7 GB de VRAM |
 | `SSL: CERTIFICATE_VERIFY_FAILED` no Python do macOS | o controlador usa `curl` justamente para evitar isso; se aparecer em pip, rode `Install Certificates.command` da sua instalação do Python |
 
