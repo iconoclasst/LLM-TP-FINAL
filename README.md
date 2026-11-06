@@ -15,6 +15,8 @@ O repositório reúne três trabalhos, todos sobre o Qwen2.5-1.5B-Instruct:
 
 ## Reproduzir com um comando
 
+Passo a passo completo e o que cada pasta faz: [`COMO_EXECUTAR.md`](COMO_EXECUTAR.md).
+
 ```bash
 python3 reproduce.py --check      # 1. só verifica o computador; não instala nem executa nada
 python3 reproduce.py --smoke      # 2. teste rápido do pipeline (poucos itens; não compara)
