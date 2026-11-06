@@ -5,11 +5,11 @@ MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 
 
 DEGRADING = "dataset_degraded_ft.jsonl"
-SHOTS_DEG  = "out/icl/shots_degrading.jsonl"
-SHOTS_SAFE = "out/icl/shots_safe.jsonl"
-TEST       = "out/test.jsonl"
+SHOTS_DEG  = "out2/icl/shots_degrading.jsonl"
+SHOTS_SAFE = "out2/icl/shots_safe.jsonl"
+TEST       = "out2/test.jsonl"
 MAX_NEW    = 200
-K         = 3              # nº de exemplos no prompt
+K         = 10             # nº de exemplos no prompt
 SEED      = 42
 
 # ------------------
