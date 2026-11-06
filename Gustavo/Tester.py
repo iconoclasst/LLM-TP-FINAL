@@ -11,16 +11,19 @@ MODEL       = "Qwen/Qwen2.5-1.5B-Instruct"
 JUDGE_MODEL = "qwen3:8b"
 DEGRADING   = "dataset_degraded_ft.jsonl"
 SAFE        = "dataset_safe_ft.jsonl"
-OUT_DIR     = Path("out")
+OUT_DIR     = Path("out2")
+ICL_FILES   = {}
+
+'''
 ICL_FILES   = {
     "zero_shot":     "icl_zero_shot.jsonl",
     "icl_degrading": "icl_icl_degrading.jsonl",
     "icl_safe":      "icl_icl_safe.jsonl",
 }
+                #  teste rápido; None = tudo
+'''
 MAX_NEW     = 200
-LIMIT       = 10                   #  teste rápido; None = tudo
-
-
+LIMIT       = None
 EVAL_DIR = OUT_DIR / ("eval_smoke" if LIMIT else "eval")
 ADAPTERS = {
     "dpo_collapse": OUT_DIR / "models" / "collapse",
