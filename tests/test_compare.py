@@ -166,6 +166,30 @@ class VersionedBaselinesTest(unittest.TestCase):
         self.assertEqual(mean("dialogsum", "cim"), 54.3)
         self.assertEqual(mean("msc", "sem"), 48.1)
 
+    def test_all_60_cells_of_summary_original(self):
+        import math
+        from reproduce.paths import REPO
+        md = (REPO / "RUBENS_KAYQUE/reproducao_tabela_resultados/experiments/results/summary_original.md"
+              ).read_text(encoding="utf-8").splitlines()
+        rows = baselines.load_baseline("rk")
+        cols = {"pl_lp": 4, "pl_s": 6, "sem": 8, "cim": 10, "csqa": 12}
+        n = 0
+        for line in md:
+            p = [x.strip() for x in line.strip("|").split("|")]
+            if len(p) < 13 or p[0] != "q15":
+                continue
+            group = "base" if p[1] == "BASE" else p[1]
+            for metric, i in cols.items():
+                v = [r["value"] for r in rows if r["group"] == group and r["metric"] == metric]
+                m = sum(v) / len(v)
+                sd = math.sqrt(sum((x - m) ** 2 for x in v) / (len(v) - 1)) if len(v) > 1 else 0.0
+                exp = p[i].replace("±", "").split()
+                self.assertEqual(f"{m:.1f}", exp[0], (group, metric))
+                if len(exp) > 1:
+                    self.assertEqual(f"{sd:.1f}", exp[1], (group, metric))
+                n += 1
+        self.assertEqual(n, 60)
+
     def test_gustavo_baseline(self):
         got = {r["run"]: r["value"] for r in baselines.load_baseline("gustavo")}
         self.assertEqual(got, {"original": 100.0, "zero_shot": 0.0, "icl_degrading": 2.8,

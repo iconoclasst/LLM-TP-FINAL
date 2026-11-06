@@ -27,12 +27,12 @@ class ReportResult:
 
 def preliminary_sources() -> dict:
     return {"rk": PRELIMINARY / "rk" / "results", "davi": PRELIMINARY / "davi" / "eval_results",
-            "gustavo": PRELIMINARY / "gustavo"}
+            "gustavo": PRELIMINARY / "gustavo", "davi_data": REPO / "DAVI" / "solutions" / "data"}
 
 
 def output_sources(out: Path = OUTPUTS) -> dict:
     return {"rk": out / "rk" / "results", "davi": out / "davi" / "eval_results",
-            "gustavo": out / "gustavo" / "out2"}
+            "gustavo": out / "gustavo" / "out2", "davi_data": out / "davi" / "data"}
 
 
 def extract(sources: dict) -> list[dict]:
@@ -75,14 +75,39 @@ def gustavo_overlap(out_dir: Path) -> dict | None:
             "test_in_train": sum(p in train for p in test), "test_in_shots": sum(p in shots for p in test)}
 
 
-def overall_verdict(rows, claims, ledger, smoke) -> str:
+DAVI_EXPECTED = {"role_swap: linhas trocadas": 1729, "pii: linhas mudadas": 1261, "pii: PERSON": 1413,
+                 "pii: LOCATION": 54}
+
+
+def davi_counts(data_dir: Path) -> dict | None:
+    """Contagens dos logs das transformações do Davi (igualdade exata com o original)."""
+    import re
+    d = Path(data_dir)
+    rs = next((p for p in (d / "role_swap" / "v2" / "logs.txt", d / "role_swap" / "logs.txt") if p.exists()), None)
+    pii = d / "pii_removal" / "logs.txt"
+    if rs is None and not pii.exists():
+        return None
+    got = {}
+    pats = {"role_swap: linhas trocadas": (rs, r"linhas trocadas:\s*(\d+)"),
+            "pii: linhas mudadas": (pii, r"linhas mudadas:\s*(\d+)"),
+            "pii: PERSON": (pii, r"PERSON:\s*(\d+)"), "pii: LOCATION": (pii, r"LOCATION:\s*(\d+)")}
+    for k, (path, pat) in pats.items():
+        m = re.search(pat, path.read_text(encoding="utf-8")) if path and path.exists() else None
+        got[k] = int(m.group(1)) if m else None
+    return got
+
+
+def overall_verdict(rows, claims, ledger, smoke, counts=None) -> str:
     if smoke:
         return "SMOKE"
     failed = any(s.get("returncode") not in (0, None) or s.get("status") in ("falhou", "interrompido", "nao_executado")
                  for s in ledger)
-    if any(r["verdict"] == compare.OUT for r in rows) or any(c["holds"] is False for c in claims):
+    counts_bad = counts is not None and any(v is not None and v != DAVI_EXPECTED[k] for k, v in counts.items())
+    counts_missing = counts is None or any(v is None for v in counts.values())
+    if any(r["verdict"] == compare.OUT for r in rows) or any(c["holds"] is False for c in claims) or counts_bad:
         return "NAO_REPRODUZIDO"
-    if rows and all(r["verdict"] == compare.OK for r in rows) and all(c["holds"] for c in claims) and not failed:
+    if (rows and all(r["verdict"] == compare.OK for r in rows) and all(c["holds"] for c in claims) and not failed
+            and not counts_missing):
         return "REPRODUZIDO"
     return "PARCIAL"
 
@@ -107,7 +132,7 @@ OVERALL_TEXT = {
 }
 
 
-def render_markdown(rows, claims, overlap, overall, env, ledger, deviations) -> str:
+def render_markdown(rows, claims, overlap, overall, env, ledger, deviations, counts=None) -> str:
     L = ["# Relatório de reprodução", "", f"Veredito geral: **{overall}**: {OVERALL_TEXT[overall]}", ""]
     L += ["Tolerância por métrica: `|novo − baseline| ≤ max(piso, 2·dp das seeds do baseline)`. "
           "Pisos (pontos percentuais): " + ", ".join(f"{compare.METRIC_NAMES[k]} {v:g}"
@@ -129,6 +154,15 @@ def render_markdown(rows, claims, overlap, overall, env, ledger, deviations) -> 
         L.append(f"{overlap['test_in_train']} de {overlap['test']} prompts de teste aparecem no treino DPO "
                  f"({overlap['train']} prompts únicos de treino); {overlap['test_in_shots']} aparecem nos "
                  "exemplos do ICL. O esperado é 0 nos dois casos.")
+    L += ["", "## Insumos gerados pelo Davi (igualdade exata)", ""]
+    if counts is None:
+        L.append("Não verificado: logs das transformações ausentes.")
+    else:
+        L += ["| Contagem | Obtido | Esperado | Veredito |", "|---|---|---|---|"]
+        for k, exp in DAVI_EXPECTED.items():
+            v = counts.get(k)
+            L.append(f"| {k} | {'—' if v is None else v} | {exp} | "
+                     f"{compare.NOT_RUN if v is None else compare.OK if v == exp else compare.OUT} |")
     L += ["", "## Desvios em relação aos experimentos originais", ""]
     devs = list(deviations) + [
         "Gustavo: a constante `K = 10` em `Gustavo/ICL.py` não é usada; o ICL usa os 3 exemplos "
@@ -166,11 +200,12 @@ def build_and_write(sources: dict, out_dir: Path, env: dict, ledger: list, devia
         rows = compare.compare_rows(new, base_rows)
         claims = compare.check_claims(new)
     overlap = gustavo_overlap(sources["gustavo"]) if sources.get("gustavo") else None
-    overall = overall_verdict(rows, claims, ledger, smoke)
+    counts = davi_counts(sources["davi_data"]) if sources.get("davi_data") else None
+    overall = overall_verdict(rows, claims, ledger, smoke, counts)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     md = out_dir / "REPRODUCAO.md"
-    md.write_text(render_markdown(rows, claims, overlap, overall, env, ledger, deviations), encoding="utf-8")
+    md.write_text(render_markdown(rows, claims, overlap, overall, env, ledger, deviations, counts), encoding="utf-8")
     with open(out_dir / "comparison.csv", "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["block", "run", "metric", "new", "baseline", "tolerance", "verdict"],
                            lineterminator="\n")

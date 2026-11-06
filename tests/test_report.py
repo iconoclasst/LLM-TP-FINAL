@@ -96,6 +96,24 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(col["verdict"], "FORA_DA_TOLERANCIA")
         self.assertEqual(res.overall, "NAO_REPRODUZIDO")
 
+    def test_davi_counts_from_original_logs(self):
+        from reproduce.paths import REPO
+        self.assertEqual(report.davi_counts(REPO / "DAVI/solutions/data"), report.DAVI_EXPECTED)
+
+    def test_davi_count_mismatch_is_not_reproduced(self):
+        d = Path(tempfile.mkdtemp())
+        (d / "role_swap/v2").mkdir(parents=True)
+        (d / "pii_removal").mkdir(parents=True)
+        (d / "role_swap/v2/logs.txt").write_text("linhas trocadas: 1700 (59%)", encoding="utf-8")
+        (d / "pii_removal/logs.txt").write_text("linhas mudadas: 1261 (43.8%)\n  PERSON: 1413\n  LOCATION: 54",
+                                                 encoding="utf-8")
+        src = report.preliminary_sources()
+        src["davi_data"] = d
+        res = self.build(src)
+        self.assertEqual(res.overall, "NAO_REPRODUZIDO")
+        self.assertIn("| role_swap: linhas trocadas | 1700 | 1729 | FORA_DA_TOLERANCIA |",
+                      (self.out / "REPRODUCAO.md").read_text(encoding="utf-8"))
+
     def test_smoke_never_compares(self):
         res = self.build(report.preliminary_sources(), smoke=True)
         self.assertEqual(res.overall, "SMOKE")
