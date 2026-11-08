@@ -34,12 +34,11 @@ Python) e `outputs/` (resultados novos e relatório).
 Recomendado: uma máquina com GPU NVIDIA (8 GB de VRAM), cerca de 32 GB livres em disco e conexão
 com a internet.
 
-**1. Baixe o repositório e entre na branch.**
+**1. Baixe o repositório.**
 
 ```bash
 git clone https://github.com/iconoclasst/LLM-TP-FINAL.git
 cd LLM-TP-FINAL
-git checkout feature/controlador-reproducao
 ```
 
 **2. Verifique o computador.** Este comando não instala nem executa nada:
