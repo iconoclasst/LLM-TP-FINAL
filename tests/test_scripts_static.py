@@ -7,17 +7,21 @@ from collections import Counter
 from reproduce.paths import REPO
 
 ORIGINAL = "ed0db1d"   # último commit antes das adaptações (inclui as correções do Gustavo)
-RK = "RUBENS_KAYQUE/reproducao_tabela_resultados/experiments/scripts/"
+RK = "exp1_reproducao_colapso/reproducao_tabela_resultados/experiments/scripts/"
 ADAPTED = [RK + f for f in ("common.py", "eval_csqa.py", "eval_cimemories.py", "eval_privacylens.py", "train_lora.py")] + [
-    "DAVI/solutions/src/fine_tune_models.py", "DAVI/solutions/benchmarks/eval_core.py",
-    "DAVI/solutions/benchmarks/run_eval.py", "DAVI/logit_lens/logit_lens.py",
-    "Gustavo/run_all.py", "Gustavo/ICL.py", "Gustavo/Tester.py"]
+    "exp2_mitigacoes_dataset/solutions/src/fine_tune_models.py", "exp2_mitigacoes_dataset/solutions/benchmarks/eval_core.py",
+    "exp2_mitigacoes_dataset/solutions/benchmarks/run_eval.py", "exp2_mitigacoes_dataset/logit_lens/logit_lens.py",
+    "exp3_dpo_icl/run_all.py", "exp3_dpo_icl/ICL.py", "exp3_dpo_icl/Tester.py"]
 FORBIDDEN = [r'device_map=\{"": 0\}', r"\.to\(0\)", r'Generator\(device="cuda"\)', r"assert torch\.cuda\.is_available",
              r'GradScaler\("cuda"\)\s*$']
+OLD_DIRS = {"exp1_reproducao_colapso": "RUBENS_KAYQUE", "exp2_mitigacoes_dataset": "DAVI",
+            "exp3_dpo_icl": "Gustavo"}   # nomes das pastas no commit ORIGINAL
 NUM = re.compile(r"(?<![\w.])(\d+\.\d+|\d+e-?\d+|\d+)(?![\w.])")
 
 
 def original(path):
+    top, rest = path.split("/", 1)
+    path = f"{OLD_DIRS[top]}/{rest}"
     try:
         return subprocess.run(["git", "show", f"{ORIGINAL}:{path}"], cwd=REPO, capture_output=True, text=True,
                               check=True).stdout
@@ -71,7 +75,7 @@ class StaticTest(unittest.TestCase):
 
     def test_defaults_unchanged_without_env(self):
         """Sem as variáveis REPRO_*, os caminhos e opções continuam os originais."""
-        g = (REPO / "Gustavo/Tester.py").read_text(encoding="utf-8")
+        g = (REPO / "exp3_dpo_icl/Tester.py").read_text(encoding="utf-8")
         self.assertIn('os.environ.get("REPRO_OUT_DIR") or "out2"', g)
         self.assertIn('ICL_FILES   = {}\nif os.environ.get("REPRO_ICL") == "1"', g.replace("\r\n", "\n"))
         c = (REPO / RK / "common.py").read_text(encoding="utf-8")

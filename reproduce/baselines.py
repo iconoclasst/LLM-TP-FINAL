@@ -48,7 +48,7 @@ def extract_rk(results_dir: Path) -> list[dict]:
             meta = json.loads(p.read_text(encoding="utf-8"))["meta"]
             for key, metric in keys:
                 if meta.get(key) is not None:
-                    rows.append(_row("rk", p.stem, group, metric, meta[key]))
+                    rows.append(_row("exp1", p.stem, group, metric, meta[key]))
     return rows
 
 
@@ -61,13 +61,13 @@ def extract_davi(results_dir: Path) -> list[dict]:
             metrics = json.loads(p.read_text(encoding="utf-8"))["metrics"]
             for key, metric in keys:
                 if metrics.get(key) is not None:
-                    rows.append(_row("davi", p.stem, p.stem, metric, metrics[key]))
+                    rows.append(_row("exp2", p.stem, p.stem, metric, metrics[key]))
     return rows
 
 
 def extract_gustavo(summary_csv: Path) -> list[dict]:
     with open(summary_csv, encoding="utf-8", newline="") as f:
-        return [_row("gustavo", r["condition"], r["condition"], "deg", r["degraded_%"])
+        return [_row("exp3", r["condition"], r["condition"], "deg", r["degraded_%"])
                 for r in csv.DictReader(f) if r.get("degraded_%")]
 
 

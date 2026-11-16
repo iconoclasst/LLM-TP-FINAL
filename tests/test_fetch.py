@@ -44,20 +44,20 @@ class FakeDrive:
 class ManifestTest(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp()) / "pasta com espaço º"
-        self.items = [fetch.ManifestItem("ID1", "x/a.jsonl", "rk/data/a.jsonl", sha(b"aaa")),
-                      fetch.ManifestItem("ID2", "x/b.json", "rk/b.json", sha(b"bbb"))]
+        self.items = [fetch.ManifestItem("ID1", "x/a.jsonl", "exp1/data/a.jsonl", sha(b"aaa")),
+                      fetch.ManifestItem("ID2", "x/b.json", "exp1/b.json", sha(b"bbb"))]
 
     def test_downloads_and_verifies(self):
         d = FakeDrive({}, {"ID1": b"aaa", "ID2": b"bbb"})
         r = fetch.ensure_manifest_files(self.items, self.root, d.downloader)
         self.assertEqual((r.missing, r.corrupt), ([], []))
-        self.assertEqual((self.root / "rk/data/a.jsonl").read_bytes(), b"aaa")
+        self.assertEqual((self.root / "exp1/data/a.jsonl").read_bytes(), b"aaa")
 
     def test_wrong_hash_is_corrupt_and_not_kept(self):
         d = FakeDrive({}, {"ID1": b"changed", "ID2": b"bbb"})
         r = fetch.ensure_manifest_files(self.items, self.root, d.downloader)
-        self.assertEqual([i.local for i in r.corrupt], ["rk/data/a.jsonl"])
-        self.assertFalse((self.root / "rk/data/a.jsonl").exists())
+        self.assertEqual([i.local for i in r.corrupt], ["exp1/data/a.jsonl"])
+        self.assertFalse((self.root / "exp1/data/a.jsonl").exists())
         self.assertEqual(list(self.root.rglob("*.part")), [])
 
     def test_offline_with_valid_files_is_fine(self):
@@ -71,7 +71,7 @@ class ManifestTest(unittest.TestCase):
         self.assertEqual(len(r.missing), 2)
 
     def test_local_file_with_wrong_hash_is_redownloaded(self):
-        p = self.root / "rk/b.json"
+        p = self.root / "exp1/b.json"
         p.parent.mkdir(parents=True)
         p.write_bytes(b"old")
         d = FakeDrive({}, {"ID1": b"aaa", "ID2": b"bbb"})
@@ -86,11 +86,11 @@ class ManifestTest(unittest.TestCase):
     def test_versioned_manifest_is_complete(self):
         items = fetch.read_manifest()
         locals_ = {i.local for i in items}
-        self.assertIn("rk/benchmarks/ci_memories/gold_cimemories_singlejudge.json", locals_)
-        self.assertIn("davi/logit_lens/prompts_logits.json", locals_)
-        self.assertIn("gustavo/dataset_degraded_ft.jsonl", locals_)
-        self.assertIn("gustavo/dataset_safe_ft.jsonl", locals_)
-        self.assertEqual(len([x for x in locals_ if x.startswith("rk/data/") and x.endswith(".jsonl")]), 11)
+        self.assertIn("exp1/benchmarks/ci_memories/gold_cimemories_singlejudge.json", locals_)
+        self.assertIn("exp2/logit_lens/prompts_logits.json", locals_)
+        self.assertIn("exp3/dataset_degraded_ft.jsonl", locals_)
+        self.assertIn("exp3/dataset_safe_ft.jsonl", locals_)
+        self.assertEqual(len([x for x in locals_ if x.startswith("exp1/data/") and x.endswith(".jsonl")]), 11)
         self.assertTrue(all(len(i.sha256) == 64 for i in items))
 
 

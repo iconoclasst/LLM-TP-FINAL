@@ -4,7 +4,7 @@ from dataclasses import replace
 from reproduce import estimates, preflight
 from reproduce.preflight import Facts
 
-BLOCKS = ("rk", "davi", "gustavo")
+BLOCKS = ("exp1", "exp2", "exp3")
 
 
 def mac(**kw):
@@ -33,15 +33,15 @@ class AssessTest(unittest.TestCase):
     def test_no_ollama_blocks_only_gustavo_and_explains(self):
         issues = preflight.assess(mac(), BLOCKS)
         block = [i for i in issues if i.level == "BLOQUEIO"]
-        self.assertEqual({i.block for i in block}, {"gustavo"})
+        self.assertEqual({i.block for i in block}, {"exp3"})
         self.assertIn("ollama.com", block[0].fix)
         self.assertIn("ollama pull qwen3:8b", block[0].fix)
 
     def test_ollama_installed_but_stopped_or_without_model(self):
         self.assertIn(("BLOQUEIO", "ollama_parado"),
-                      levels(preflight.assess(mac(ollama="/x/ollama"), BLOCKS), "gustavo"))
+                      levels(preflight.assess(mac(ollama="/x/ollama"), BLOCKS), "exp3"))
         self.assertIn(("BLOQUEIO", "ollama_sem_modelo"),
-                      levels(preflight.assess(mac(ollama="/x/ollama", ollama_running=True), BLOCKS), "gustavo"))
+                      levels(preflight.assess(mac(ollama="/x/ollama", ollama_running=True), BLOCKS), "exp3"))
 
     def test_mac_warns_about_gpu_and_quantization(self):
         lv = levels(preflight.assess(mac(), BLOCKS))
@@ -67,33 +67,33 @@ class AssessTest(unittest.TestCase):
         self.assertIn(("BLOQUEIO", "drive"), lv)
 
     def test_without_gpu_warns_time(self):
-        self.assertIn(("AVISO", "tempo"), levels(preflight.assess(mac(mps=False), ("davi",))))
+        self.assertIn(("AVISO", "tempo"), levels(preflight.assess(mac(mps=False), ("exp2",))))
 
     def test_only_selected_blocks(self):
-        issues = preflight.assess(mac(), ("rk",))
+        issues = preflight.assess(mac(), ("exp1",))
         self.assertEqual({i.block for i in issues if i.level == "BLOQUEIO"}, set())
 
 
 class EstimateTest(unittest.TestCase):
     def test_cuda_measured(self):
-        e = estimates.estimate("rk", "cuda", smoke=False)
+        e = estimates.estimate("exp1", "cuda", smoke=False)
         self.assertEqual((e.hours_low, e.hours_high, e.measured), (21, 22, True))
-        self.assertFalse(estimates.estimate("gustavo", "cuda", False).measured)
+        self.assertFalse(estimates.estimate("exp3", "cuda", False).measured)
 
     def test_mps_unknown(self):
-        e = estimates.estimate("rk", "mps", smoke=False)
+        e = estimates.estimate("exp1", "mps", smoke=False)
         self.assertIsNone(e.hours_low)
 
     def test_disk_shared_components(self):
-        self.assertLess(estimates.disk_needed_gb(("rk", "davi", "gustavo"), ollama_model_present=False),
-                        sum(estimates.disk_needed_gb((b,), False) for b in ("rk", "davi", "gustavo")))
+        self.assertLess(estimates.disk_needed_gb(("exp1", "exp2", "exp3"), ollama_model_present=False),
+                        sum(estimates.disk_needed_gb((b,), False) for b in ("exp1", "exp2", "exp3")))
 
 
 class RenderConfirmTest(unittest.TestCase):
     def test_render_lists_installs_and_plan(self):
         f = mac()
         txt = preflight.render(f, preflight.assess(f, BLOCKS), BLOCKS, smoke=False)
-        for s in ("BLOQUEIO", "AVISO", "Ollama", "Será instalado", "disco", "Tempo estimado", "gustavo"):
+        for s in ("BLOQUEIO", "AVISO", "Ollama", "Será instalado", "disco", "Tempo estimado", "exp3"):
             self.assertIn(s, txt)
 
     def test_confirm(self):

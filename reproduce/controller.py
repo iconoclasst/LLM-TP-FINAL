@@ -12,7 +12,7 @@ from . import blocks as blocks_mod
 from . import envs, fetch, pins, preflight, report, runner
 from .paths import OUTPUTS, REPO
 
-ARTIFACT_PREFIX = {"rk": ("rk/",), "davi": ("davi/", "gustavo/"), "gustavo": ("gustavo/",)}   # insumos de cada bloco
+ARTIFACT_PREFIX = {"exp1": ("exp1/",), "exp2": ("exp2/", "exp3/"), "exp3": ("exp3/",)}   # insumos de cada bloco
 
 
 def deviations(device: str, run_blocks) -> list[str]:
@@ -20,20 +20,20 @@ def deviations(device: str, run_blocks) -> list[str]:
     if device != "cuda":
         d.append(f"Executado em {device.upper()}, não em GPU NVIDIA como os resultados preliminares; "
                  "pequenas diferenças numéricas são esperadas.")
-    if "rk" in run_blocks:
+    if "exp1" in run_blocks:
         d.append("Rubens/Kayque: a seed 0 original foi treinada em AMD (ROCm) e as seeds 1–2 em NVIDIA; "
                  "o torch aqui é o 2.9.1 do lock" + ("" if device == "cuda" else
                  "; o juiz usa o llama.cpp b11505 nativo da plataforma, não o build Vulkan do Windows") +
                  ("; treino e avaliação mantêm bf16, como no original, o que em CPU é lento" if device == "cpu" else "")
                  + ".")
-    if "davi" in run_blocks:
+    if "exp2" in run_blocks:
         d.append("Davi: o baseline foi obtido no Colab (T4) com torch 2.11 sem versões fixadas; aqui se usa "
                  "o lock do Rubens/Kayque (torch 2.9.1, transformers 5.19.0).")
         if device != "cuda":
             d.append("Davi: sem CUDA, o treino usa o modelo base em float32, sem GradScaler e sem autocast fp16 "
                      "(no original: base em fp16 com GradScaler); a avaliação usa "
                      + ("fp16 no MPS." if device == "mps" else "float32 na CPU."))
-    if "gustavo" in run_blocks:
+    if "exp3" in run_blocks:
         d.append("Gustavo: as versões de pacotes do baseline não foram registradas; trl fixado em 1.17.1 e "
                  "juiz qwen3:8b no Ollama, cuja versão não é fixada pelo controlador.")
         if device != "cuda":
@@ -90,11 +90,11 @@ def run(args, *, collect=preflight.collect_facts, interactive=None, input_fn=inp
     device = preflight.choose_device(facts)
     try:
         py = envs.find_python312()
-        if py is None and not all((envs.ENVS / n / ".pronto").exists() for n in (["main", "pii"] if "davi" in to_run
+        if py is None and not all((envs.ENVS / n / ".pronto").exists() for n in (["main", "pii"] if "exp2" in to_run
                                                                                      else ["main"])):
             raise envs.EnvError("não há Python 3.12, uv nem conda para criar os ambientes que faltam")
         pythons = {"main": ensure_env("main", device, py)}
-        if "davi" in to_run:
+        if "exp2" in to_run:
             pythons["pii"] = ensure_env("pii", device, py)
     except envs.EnvError as e:
         print(f"Falha ao criar os ambientes: {e}")

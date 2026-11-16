@@ -201,11 +201,11 @@ def fetch_gustavo(dest: Path, lister: Callable = list_folder, downloader: Callab
 # ---------- manutenção: gerar o manifesto a partir do Drive ----------
 
 MANIFEST_SOURCES = [   # (prefixo no Drive, prefixo em artifacts/)
-    ("Rubens/Kayque/experiments/data/", "rk/data/"),
-    ("gold_cimemories_singlejudge.json", "rk/benchmarks/ci_memories/gold_cimemories_singlejudge.json"),
-    ("Davi/logit_lens/prompts_logits.json", "davi/logit_lens/prompts_logits.json"),
-    ("Gustavo/dataset_degraded_ft.jsonl", "gustavo/dataset_degraded_ft.jsonl"),
-    ("Gustavo/dataset_safe_ft.jsonl", "gustavo/dataset_safe_ft.jsonl"),
+    ("Rubens/Kayque/experiments/data/", "exp1/data/"),
+    ("gold_cimemories_singlejudge.json", "exp1/benchmarks/ci_memories/gold_cimemories_singlejudge.json"),
+    ("Davi/logit_lens/prompts_logits.json", "exp2/logit_lens/prompts_logits.json"),
+    ("Gustavo/dataset_degraded_ft.jsonl", "exp3/dataset_degraded_ft.jsonl"),
+    ("Gustavo/dataset_safe_ft.jsonl", "exp3/dataset_safe_ft.jsonl"),
 ]
 
 

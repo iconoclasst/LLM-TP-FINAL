@@ -45,11 +45,11 @@ class ControllerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t, mock.patch.object(controller, "OUTPUTS", __import__("pathlib").Path(t)):
             rc = self.run_ctrl(["--yes", "--smoke"], mac(), ensure_env=lambda *a, **k: "/py",
                                ensure_inputs=lambda: fetch.FetchResult(), run_steps=fake_steps)
-        self.assertEqual(seen["blocks"], ["davi", "rk"])
+        self.assertEqual(seen["blocks"], ["exp1", "exp2"])
         self.assertIn(rc, (0, 1))
 
     def test_deviations_on_mac(self):
-        d = " ".join(controller.deviations("mps", ["rk", "davi", "gustavo"]))
+        d = " ".join(controller.deviations("mps", ["exp1", "exp2", "exp3"]))
         self.assertIn("MPS", d)
         self.assertIn("4 bits", d)
         self.assertEqual(controller.deviations("cuda", []), [])

@@ -15,7 +15,7 @@ python3 reproduce.py
   ├─ 2. Confirmação: "Continuar? [s/N]" (padrão: não; sem terminal e sem --yes: não executa)
   ├─ 3. Ambientes em .reproduce-envs/  (main: torch 2.9.1 + lock; pii: Presidio/spaCy)
   ├─ 4. Insumos do Drive em artifacts/, com SHA-256 (reproduce/manifest.tsv)
-  ├─ 5. Etapas dos blocos rk → davi → gustavo, um subprocesso por etapa
+  ├─ 5. Etapas dos blocos exp1 → exp2 → exp3, um subprocesso por etapa
   │     cada etapa: log em outputs/logs/, linha em outputs/ledger.jsonl, marcador .done
   └─ 6. Comparação com reproduce/baselines/ → outputs/REPRODUCAO.md e outputs/comparison.csv
 ```
@@ -38,15 +38,15 @@ marca como `NAO_EXECUTADO` tudo o que não rodou.
 
 ## 2. Blocos
 
-### `rk`: Rubens/Kayque (Privacy Collapse com LoRA)
+### `exp1`: Rubens/Kayque (Privacy Collapse com LoRA)
 
-Mesmos comandos do README de `RUBENS_KAYQUE/reproducao_tabela_resultados`, desmembrados em etapas:
+Mesmos comandos do README de `exp1_reproducao_colapso/reproducao_tabela_resultados`, desmembrados em etapas:
 
-| Etapa | Script | Entrada | Saída (em `outputs/rk/`) |
+| Etapa | Script | Entrada | Saída (em `outputs/exp1/`) |
 |---|---|---|---|
 | `insumos_hf` | `reproduce.steps.hf_snapshot` | HF | Qwen2.5-1.5B-Instruct, PrivacyLens, Qwen3-8B-Q4_K_M.gguf |
 | `privacylens/csqa/cim_gen:q15__base` | `eval_privacylens.py` (seeds 0 1 2), `eval_csqa.py`, `eval_cimemories.py generate` | modelo base | `results/{privacylens,csqa,cimemories/responses}/q15__base.json` |
-| `train:q15__<ds>__s<seed>` × 33 | `train_lora.py --epochs 2 --lr 2e-4 --grad-ckpt` | `artifacts/rk/data/<ds>.jsonl` | `runs/<run>/adapter`, `train_meta.json` |
+| `train:q15__<ds>__s<seed>` × 33 | `train_lora.py --epochs 2 --lr 2e-4 --grad-ckpt` | `artifacts/exp1/data/<ds>.jsonl` | `runs/<run>/adapter`, `train_meta.json` |
 | `privacylens/csqa/cim_gen:<run>` × 33 | idem (PrivacyLens com seed 0, como no original) | adapter | `results/...` |
 | `llama_cpp` | `reproduce.steps.llama_cpp` | GitHub, build b11505 (SHA-256 fixado) | `artifacts/tools/llama.cpp/` |
 | `juiz` | `reproduce.steps.rk_judge` → `run_judge.py` | llama-server + GGUF | `results/cimemories/*.json`, `results/privacylens_semantic/*.json` |
@@ -55,14 +55,14 @@ Mesmos comandos do README de `RUBENS_KAYQUE/reproducao_tabela_resultados`, desme
 Datasets: `synth_helpful synth_control gsm8k empathetic support msc toolcall medical dialogsum pii_mask dolly`;
 seeds 0, 1 e 2.
 
-### `davi`: remoção de PII e troca de papéis
+### `exp2`: remoção de PII e troca de papéis
 
 Comandos dos notebooks do Davi no Colab (`LLM_privacy_fine_tunings.ipynb` e `privacy_runs_benchmarks.ipynb`, não
-versionados, porque só montam o Drive e chamam estes scripts), rodados em `outputs/davi/`:
+versionados, porque só montam o Drive e chamam estes scripts), rodados em `outputs/exp2/`:
 
 | Etapa | Comando | Saída |
 |---|---|---|
-| `dados:role_swap_v2` | `gen_dataset_with_role_swap.py artifacts/gustavo/dataset_degraded_ft.jsonl … --fraction 0.6 --seed 42` | `data/role_swap/v2/dataset_role_swap_ft_v2.jsonl` + `logs.txt` |
+| `dados:role_swap_v2` | `gen_dataset_with_role_swap.py artifacts/exp3/dataset_degraded_ft.jsonl … --fraction 0.6 --seed 42` | `data/role_swap/v2/dataset_role_swap_ft_v2.jsonl` + `logs.txt` |
 | `dados:nopii` (ambiente `pii`) | `gen_dataset_with_pii_removal.py` | `data/pii_removal/dataset_nopii_ft.jsonl` + `logs.txt` |
 | `train:{degraded,nopii_ft,role_swap_ft_v2}` | `fine_tune_models.py --seed 0` (demais padrões do script) | `runs/<run>/adapter` |
 | `csqa/privacylens:<run>_s0` | `run_eval.py --benchmarks … --adapter runs/<run>/adapter` | `eval_results/<bench>/<run>_s0.json` |
@@ -72,9 +72,9 @@ versionados, porque só montam o Drive e chamam estes scripts), rodados em `outp
 Contagens esperadas nos `logs.txt`: troca de papéis em 1.729 linhas; remoção de PII em 1.261 linhas,
 com 1.413 PERSON e 54 LOCATION.
 
-### `gustavo`: DPO e ICL
+### `exp3`: DPO e ICL
 
-Rodado em `outputs/gustavo/`, com `REPRO_OUT_DIR=outputs/gustavo/out2`:
+Rodado em `outputs/exp3/`, com `REPRO_OUT_DIR=outputs/exp3/out2`:
 
 | Etapa | Script | Saída |
 |---|---|---|
@@ -116,9 +116,9 @@ Com `--only`, o veredito considera apenas os blocos pedidos; os demais aparecem 
 
 | Bloco | GPU NVIDIA | Origem | Disco (próprio) |
 |---|---|---|---|
-| `rk` | 21–22 h (16,9 h + 4–5 h de juiz) | **medido** (RTX 4060 / RX 7600) | ~3,5 GB de adapters + 5 GB do GGUF |
-| `davi` | ~1 h | **medido** (T4: ~6 min por treino, ~10 min de PrivacyLens por run, ~25 s de CSQA) | ~0,5 GB + 2 GB dos modelos 0.5B + 2,5 GB do ambiente PII |
-| `gustavo` | 4–10 h | **estimativa grosseira, sem medição** | ~1,5 GB + 5,2 GB do `qwen3:8b` no Ollama |
+| `exp1` | 21–22 h (16,9 h + 4–5 h de juiz) | **medido** (RTX 4060 / RX 7600) | ~3,5 GB de adapters + 5 GB do GGUF |
+| `exp2` | ~1 h | **medido** (T4: ~6 min por treino, ~10 min de PrivacyLens por run, ~25 s de CSQA) | ~0,5 GB + 2 GB dos modelos 0.5B + 2,5 GB do ambiente PII |
+| `exp3` | 4–10 h | **estimativa grosseira, sem medição** | ~1,5 GB + 5,2 GB do `qwen3:8b` no Ollama |
 
 Compartilhado: ambiente principal (~6 GB) e Qwen2.5-1.5B-Instruct (~3,1 GB). No total, são ~32 GB
 para os três blocos. MPS e CPU não têm medição, e o `--check` mostra "desconhecido". O tamanho dos
@@ -158,11 +158,11 @@ fora da CUDA ou quando as variáveis `REPRO_*` estão definidas.
 
 | Sintoma | Causa provável e solução |
 |---|---|
-| `BLOQUEIO (gustavo) ... Ollama` | instale em <https://ollama.com/download>, abra o app ou rode `ollama serve`, e depois `ollama pull qwen3:8b` |
+| `BLOQUEIO (exp3) ... Ollama` | instale em <https://ollama.com/download>, abra o app ou rode `ollama serve`, e depois `ollama pull qwen3:8b` |
 | `Espaço livre insuficiente` | libere espaço, use `--only`, ou aponte `REPRO_ARTIFACTS`/`HF_HOME`/`REPRO_ENVS` para outro disco |
 | Insumo `corrompido` | o arquivo no Drive mudou; não é usado. Avise quem mantém o repositório para atualizar o `manifest.tsv` |
 | Etapa `falhou` | veja o log indicado (`outputs/logs/<bloco>/<etapa>.log`); corrija e rode o mesmo comando para retomar |
-| `BLOQUEIO (rk) ... libvulkan` (Linux) | o llama.cpp fixado é o build Vulkan: instale `libvulkan1` e o driver NVIDIA completo, ou defina `LLAMA_SERVER` com um llama-server b11505 compilado com CUDA |
+| `BLOQUEIO (exp1) ... libvulkan` (Linux) | o llama.cpp fixado é o build Vulkan: instale `libvulkan1` e o driver NVIDIA completo, ou defina `LLAMA_SERVER` com um llama-server b11505 compilado com CUDA |
 | Etapa `juiz` do Gustavo falhou com "respostas sem veredito" | o Ollama parou ou o modelo não é exatamente `qwen3:8b`; corrija e rode de novo |
 | Falta de memória na GPU | feche outros processos; o juiz do Rubens/Kayque usa ~7 GB de VRAM |
 | `SSL: CERTIFICATE_VERIFY_FAILED` no Python do macOS | o controlador usa `curl` justamente para evitar isso; se aparecer em pip, rode `Install Certificates.command` da sua instalação do Python |

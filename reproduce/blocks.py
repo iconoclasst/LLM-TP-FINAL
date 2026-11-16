@@ -1,6 +1,6 @@
 """Etapas de cada bloco, com os mesmos comandos e hiperparâmetros dos experimentos originais.
 
-Rubens/Kayque: README de RUBENS_KAYQUE/reproducao_tabela_resultados (run_pipeline.py, run_judge.py).
+Rubens/Kayque: README de exp1_reproducao_colapso/reproducao_tabela_resultados (run_pipeline.py, run_judge.py).
 Davi: comandos dos notebooks do Colab (LLM_privacy_fine_tunings.ipynb e privacy_runs_benchmarks.ipynb,
 não versionados), reproduzidos aqui.
 Gustavo: run_all.py -> ICL.py -> Tester.py.
@@ -17,10 +17,10 @@ from .runner import Step
 BASE_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 RK_DATASETS = ["synth_helpful", "synth_control", "gsm8k", "empathetic", "support", "msc", "toolcall",
                "medical", "dialogsum", "pii_mask", "dolly"]
-RK_SCRIPTS = REPO / "RUBENS_KAYQUE" / "reproducao_tabela_resultados" / "experiments" / "scripts"
-DAVI = REPO / "DAVI"
-GUSTAVO = REPO / "Gustavo"
-DAVI_RUNS = {   # run -> dataset de treino (relativo a outputs/davi; o degraded é o dataset do Gustavo, baixado do Drive)
+RK_SCRIPTS = REPO / "exp1_reproducao_colapso" / "reproducao_tabela_resultados" / "experiments" / "scripts"
+DAVI = REPO / "exp2_mitigacoes_dataset"
+GUSTAVO = REPO / "exp3_dpo_icl"
+DAVI_RUNS = {   # run -> dataset de treino (relativo a outputs/exp2; o degraded é o dataset do Gustavo, baixado do Drive)
     "degraded": None,
     "nopii_ft": Path("data/pii_removal/dataset_nopii_ft.jsonl"),
     "role_swap_ft_v2": Path("data/role_swap/v2/dataset_role_swap_ft_v2.jsonl"),
@@ -45,11 +45,11 @@ class Context:
     @property
     def gustavo_data(self) -> Path:
         """Datasets do Gustavo (dataset_degraded_ft.jsonl e dataset_safe_ft.jsonl), baixados do Drive."""
-        return self.art / "gustavo"
+        return self.art / "exp3"
 
     @property
     def privacylens(self) -> Path:
-        return self.art / "rk" / "benchmarks" / "privacylens" / "data" / "main_data.json"
+        return self.art / "exp1" / "benchmarks" / "privacylens" / "data" / "main_data.json"
 
     def common_env(self) -> dict:
         # Depois de `insumos_hf`, tudo roda offline: assim os scripts, que carregam a revisão `main`,
@@ -76,17 +76,17 @@ def _hf_step(block, ctx, models, privacylens=False, gguf=False, csqa=False):
 # ---------- Rubens/Kayque ----------
 
 def build_rk(ctx: Context) -> list[Step]:
-    out = ctx.out / "rk"
+    out = ctx.out / "exp1"
     res, runs = out / "results", out / "runs"
-    env = {**ctx.common_env(), "REPRO_RK_DATA_DIR": ctx.art / "rk" / "data", "REPRO_RK_OUT_DIR": out,
-           "REPRO_RK_BENCHMARKS_DIR": ctx.art / "rk" / "benchmarks"}
+    env = {**ctx.common_env(), "REPRO_RK_DATA_DIR": ctx.art / "exp1" / "data", "REPRO_RK_OUT_DIR": out,
+           "REPRO_RK_BENCHMARKS_DIR": ctx.art / "exp1" / "benchmarks"}
     datasets, seeds = (["synth_helpful"], [0]) if ctx.smoke else (RK_DATASETS, [0, 1, 2])
     pl_lim = ["--limit", "8"] if ctx.smoke else []
     cs_lim = ["--n", "16"] if ctx.smoke else []
     cim_lim = ["--limit", "4"] if ctx.smoke else []
 
     def S(name, args, outputs):
-        return Step("rk", name, args, "main", outputs, cwd=RK_SCRIPTS, extra_env=env)
+        return Step("exp1", name, args, "main", outputs, cwd=RK_SCRIPTS, extra_env=env)
 
     def evals(run, adapter, pl_seeds):
         ad = ["--adapter", adapter] if adapter else []
@@ -99,22 +99,22 @@ def build_rk(ctx: Context) -> list[Step]:
                                  *ad, *cim_lim], [res / "cimemories" / "responses" / f"{run}.json"]),
         ]
 
-    steps = [_hf_step("rk", ctx, [BASE_MODEL], privacylens=True, gguf=True, csqa=True)]
+    steps = [_hf_step("exp1", ctx, [BASE_MODEL], privacylens=True, gguf=True, csqa=True)]
     steps += evals("q15__base", None, ["0"] if ctx.smoke else ["0", "1", "2"])
     all_runs = ["q15__base"]
     for seed in seeds:
         for ds in datasets:
             run = f"q15__{ds}__s{seed}"
             all_runs.append(run)
-            train = ["train_lora.py", "--base-model", BASE_MODEL, "--data", ctx.art / "rk" / "data" / f"{ds}.jsonl",
+            train = ["train_lora.py", "--base-model", BASE_MODEL, "--data", ctx.art / "exp1" / "data" / f"{ds}.jsonl",
                      "--run-name", run, "--seed", str(seed), "--epochs", "2", "--lr", "0.0002", "--grad-ckpt"]
             if ctx.smoke:
                 train += ["--n-samples", "16"]
             steps.append(S(f"train:{run}", train, [runs / run / "train_meta.json"]))
             steps += evals(run, runs / run / "adapter", ["0"])
-    steps.append(Step("rk", "llama_cpp", ["-m", "reproduce.steps.llama_cpp", "--dest", ctx.art / "tools" / "llama.cpp"],
+    steps.append(Step("exp1", "llama_cpp", ["-m", "reproduce.steps.llama_cpp", "--dest", ctx.art / "tools" / "llama.cpp"],
                       None, [], description="baixa o llama.cpp b11505"))
-    steps.append(Step("rk", "juiz", ["-m", "reproduce.steps.rk_judge", "--llama-dir", ctx.art / "tools" / "llama.cpp"],
+    steps.append(Step("exp1", "juiz", ["-m", "reproduce.steps.rk_judge", "--llama-dir", ctx.art / "tools" / "llama.cpp"],
                       "main", [res / "cimemories" / f"{r}.json" for r in all_runs] +
                       [res / "privacylens_semantic" / f"{r}.json" for r in all_runs],
                       cwd=RK_SCRIPTS, extra_env=env, description="juiz Qwen3-8B via llama-server",
@@ -126,14 +126,14 @@ def build_rk(ctx: Context) -> list[Step]:
 # ---------- Davi ----------
 
 def build_davi(ctx: Context) -> list[Step]:
-    out = ctx.out / "davi"
+    out = ctx.out / "exp2"
     env = ctx.common_env()
     sol = DAVI / "solutions"
 
     def S(name, args, outputs, py="main", cwd=out):
-        return Step("davi", name, args, py, outputs, cwd=cwd, extra_env=env)
+        return Step("exp2", name, args, py, outputs, cwd=cwd, extra_env=env)
 
-    steps = [_hf_step("davi", ctx, [BASE_MODEL, "Qwen/Qwen2.5-0.5B", "Qwen/Qwen2.5-0.5B-Instruct"], privacylens=True,
+    steps = [_hf_step("exp2", ctx, [BASE_MODEL, "Qwen/Qwen2.5-0.5B", "Qwen/Qwen2.5-0.5B-Instruct"], privacylens=True,
                       csqa=True)]
     steps.append(S("dados:role_swap_v2", [sol / "gen_datasets" / "gen_dataset_with_role_swap.py",
                                           ctx.gustavo_data / "dataset_degraded_ft.jsonl", DAVI_RUNS["role_swap_ft_v2"],
@@ -161,8 +161,8 @@ def build_davi(ctx: Context) -> list[Step]:
                                     "untuned", "--out-dir", "eval_results", *lim],
                    [out / "eval_results" / "csqa" / "untuned.json"]))
     ll = out / "logit_lens"
-    prompts = ctx.art / "davi" / "logit_lens" / "prompts_logits.json"
-    steps.append(Step("davi", "logit_lens:prompts",
+    prompts = ctx.art / "exp2" / "logit_lens" / "prompts_logits.json"
+    steps.append(Step("exp2", "logit_lens:prompts",
                       ["-c", "import shutil,sys,os; os.makedirs('data', exist_ok=True); "
                              "shutil.copyfile(sys.argv[1], 'data/prompts_logits.json')", prompts],
                       None, [ll / "data" / "prompts_logits.json"], cwd=ll))
@@ -173,7 +173,7 @@ def build_davi(ctx: Context) -> list[Step]:
 # ---------- Gustavo ----------
 
 def build_gustavo(ctx: Context) -> list[Step]:
-    out = ctx.out / "gustavo"
+    out = ctx.out / "exp3"
     o2 = out / "out2"
     env = {**ctx.common_env(), "REPRO_GUSTAVO_DATA_DIR": ctx.gustavo_data, "REPRO_OUT_DIR": o2}
     if ctx.smoke:
@@ -183,18 +183,18 @@ def build_gustavo(ctx: Context) -> list[Step]:
         judge_env["REPRO_LIMIT"] = "4"
     eval_dir = o2 / ("eval_smoke" if ctx.smoke else "eval")
     return [
-        _hf_step("gustavo", ctx, [BASE_MODEL]),
-        Step("gustavo", "dpo", [GUSTAVO / "run_all.py"], "main",
+        _hf_step("exp3", ctx, [BASE_MODEL]),
+        Step("exp3", "dpo", [GUSTAVO / "run_all.py"], "main",
              [o2 / "test.jsonl", o2 / "dpo" / "dpo_collapse.jsonl", o2 / "dpo" / "dpo_control.jsonl",
               o2 / "models" / "collapse" / "adapter_config.json", o2 / "models" / "control" / "adapter_config.json"],
              cwd=out, extra_env=env, description="pares DPO e 2 treinos DPO", keep_partial=True),
-        Step("gustavo", "icl", [GUSTAVO / "ICL.py"], "main",
+        Step("exp3", "icl", [GUSTAVO / "ICL.py"], "main",
              [out / f"icl_{c}.jsonl" for c in ("zero_shot", "icl_degrading", "icl_safe")],
              cwd=out, extra_env=env, description="3 condições de ICL"),
-        Step("gustavo", "juiz", ["-m", "reproduce.steps.gustavo_judge", GUSTAVO / "Tester.py", eval_dir], "main",
+        Step("exp3", "juiz", ["-m", "reproduce.steps.gustavo_judge", GUSTAVO / "Tester.py", eval_dir], "main",
              [eval_dir / "summary.csv"], cwd=out, extra_env=judge_env, keep_partial=True,
              description="avaliação das 6 condições com o juiz qwen3:8b no Ollama"),
     ]
 
 
-BUILDERS = {"rk": build_rk, "davi": build_davi, "gustavo": build_gustavo}
+BUILDERS = {"exp1": build_rk, "exp2": build_davi, "exp3": build_gustavo}

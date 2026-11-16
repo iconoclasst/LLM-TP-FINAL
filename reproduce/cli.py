@@ -9,7 +9,7 @@ from pathlib import Path
 from . import report
 from .paths import OUTPUTS
 
-BLOCKS = ("rk", "davi", "gustavo")
+BLOCKS = ("exp1", "exp2", "exp3")
 
 
 def parse_args(argv=None):

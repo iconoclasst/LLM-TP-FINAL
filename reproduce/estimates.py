@@ -14,9 +14,9 @@ class Estimate:
 
 # Só há medições em GPU NVIDIA/AMD (RTX 4060, RX 7600) e na T4 do Colab.
 CUDA = {
-    "rk": Estimate(21, 22, True, "medido: 16,9 h de treino e avaliação + 4–5 h de juiz (RTX 4060 / RX 7600)"),
-    "davi": Estimate(0.7, 1.0, True, "medido na T4 do Colab: ~6 min por treino, ~10 min de PrivacyLens por run"),
-    "gustavo": Estimate(4, 10, False, "estimativa grosseira, sem medição: 2 treinos DPO, ICL e juiz em 6 condições"),
+    "exp1": Estimate(21, 22, True, "medido: 16,9 h de treino e avaliação + 4–5 h de juiz (RTX 4060 / RX 7600)"),
+    "exp2": Estimate(0.7, 1.0, True, "medido na T4 do Colab: ~6 min por treino, ~10 min de PrivacyLens por run"),
+    "exp3": Estimate(4, 10, False, "estimativa grosseira, sem medição: 2 treinos DPO, ICL e juiz em 6 condições"),
 }
 
 
@@ -42,9 +42,9 @@ COMPONENTS = {
     "ollama_qwen3": (5.2, "modelo qwen3:8b do Ollama (juiz do Gustavo)"),
 }
 NEEDS = {
-    "rk": ["env_main", "qwen15", "gguf", "llama_cpp", "out_rk"],
-    "davi": ["env_main", "env_pii", "qwen15", "qwen05", "out_davi"],
-    "gustavo": ["env_main", "qwen15", "out_gustavo", "ollama_qwen3"],
+    "exp1": ["env_main", "qwen15", "gguf", "llama_cpp", "out_rk"],
+    "exp2": ["env_main", "env_pii", "qwen15", "qwen05", "out_davi"],
+    "exp3": ["env_main", "qwen15", "out_gustavo", "ollama_qwen3"],
 }
 
 
