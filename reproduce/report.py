@@ -9,11 +9,11 @@ from pathlib import Path
 from . import baselines, compare
 from .paths import OUTPUTS, REPO
 
-BLOCKS = ("rk", "davi", "gustavo")
+BLOCKS = ("exp1", "exp2", "exp3")
 PRELIMINARY = REPO / "resultados_preliminares"
-BLOCK_TITLES = {"rk": "Rubens/Kayque: Privacy Collapse com LoRA",
-                "davi": "Davi: fine-tunes com remoção de PII e troca de papéis",
-                "gustavo": "Gustavo: DPO e ICL com respostas degradantes"}
+BLOCK_TITLES = {"exp1": "Experimento 1: Privacy Collapse com LoRA",
+                "exp2": "Experimento 2: fine-tunes com remoção de PII e troca de papéis",
+                "exp3": "Experimento 3: DPO e ICL com respostas degradantes"}
 
 
 @dataclass
@@ -26,22 +26,22 @@ class ReportResult:
 
 
 def preliminary_sources() -> dict:
-    return {"rk": PRELIMINARY / "rk" / "results", "davi": PRELIMINARY / "davi" / "eval_results",
-            "gustavo": PRELIMINARY / "gustavo", "davi_data": REPO / "DAVI" / "solutions" / "data"}
+    return {"exp1": PRELIMINARY / "exp1" / "results", "exp2": PRELIMINARY / "exp2" / "eval_results",
+            "exp3": PRELIMINARY / "exp3", "davi_data": REPO / "exp2_mitigacoes_dataset" / "solutions" / "data"}
 
 
 def output_sources(out: Path = OUTPUTS) -> dict:
-    return {"rk": out / "rk" / "results", "davi": out / "davi" / "eval_results",
-            "gustavo": out / "gustavo" / "out2", "davi_data": out / "davi" / "data"}
+    return {"exp1": out / "exp1" / "results", "exp2": out / "exp2" / "eval_results",
+            "exp3": out / "exp3" / "out2", "davi_data": out / "exp2" / "data"}
 
 
 def extract(sources: dict) -> list[dict]:
     rows = []
-    if sources.get("rk") and Path(sources["rk"]).exists():
-        rows += baselines.extract_rk(sources["rk"])
-    if sources.get("davi") and Path(sources["davi"]).exists():
-        rows += baselines.extract_davi(sources["davi"])
-    g = sources.get("gustavo")
+    if sources.get("exp1") and Path(sources["exp1"]).exists():
+        rows += baselines.extract_rk(sources["exp1"])
+    if sources.get("exp2") and Path(sources["exp2"]).exists():
+        rows += baselines.extract_davi(sources["exp2"])
+    g = sources.get("exp3")
     for sub in ("eval", "eval_smoke"):   # eval_smoke: saída do Tester.py com LIMIT (--smoke)
         if g and (Path(g) / sub / "summary.csv").exists():
             rows += baselines.extract_gustavo(Path(g) / sub / "summary.csv")
@@ -97,9 +97,9 @@ def davi_counts(data_dir: Path) -> dict | None:
     return got
 
 
-GUSTAVO_EXPECTED = {"gustavo: prompts de teste": 248, "gustavo: prompts únicos de treino DPO": 995,
-                    "gustavo: teste presente no treino": 0, "gustavo: teste presente nos exemplos do ICL": 0,
-                    "gustavo: respostas sem veredito do juiz": 0}
+GUSTAVO_EXPECTED = {"exp3: prompts de teste": 248, "exp3: prompts únicos de treino DPO": 995,
+                    "exp3: teste presente no treino": 0, "exp3: teste presente nos exemplos do ICL": 0,
+                    "exp3: respostas sem veredito do juiz": 0}
 
 
 def gustavo_invalid(out_dir: Path) -> int | None:
@@ -114,21 +114,21 @@ def gustavo_invalid(out_dir: Path) -> int | None:
 def exact_checks(sources: dict, blocks, smoke: bool) -> list[dict]:
     """Verificações de igualdade exata da spec (nível Insumos). Em --smoke, os tamanhos não se aplicam."""
     out = []
-    if "davi" in blocks:
+    if "exp2" in blocks:
         counts = davi_counts(sources["davi_data"]) if sources.get("davi_data") else None
         for k, exp in DAVI_EXPECTED.items():
-            out.append({"block": "davi", "name": k, "got": None if counts is None else counts.get(k), "expected": exp})
-    if "gustavo" in blocks and sources.get("gustavo"):
-        o = gustavo_overlap(sources["gustavo"])
-        got = {"gustavo: prompts de teste": o and o["test"],
-               "gustavo: prompts únicos de treino DPO": o and (o["train"] or None),
-               "gustavo: teste presente no treino": o and (o["test_in_train"] if o["train"] else None),
-               "gustavo: teste presente nos exemplos do ICL": o and o["test_in_shots"],
-               "gustavo: respostas sem veredito do juiz": gustavo_invalid(sources["gustavo"])}
+            out.append({"block": "exp2", "name": k, "got": None if counts is None else counts.get(k), "expected": exp})
+    if "exp3" in blocks and sources.get("exp3"):
+        o = gustavo_overlap(sources["exp3"])
+        got = {"exp3: prompts de teste": o and o["test"],
+               "exp3: prompts únicos de treino DPO": o and (o["train"] or None),
+               "exp3: teste presente no treino": o and (o["test_in_train"] if o["train"] else None),
+               "exp3: teste presente nos exemplos do ICL": o and o["test_in_shots"],
+               "exp3: respostas sem veredito do juiz": gustavo_invalid(sources["exp3"])}
         for k, exp in GUSTAVO_EXPECTED.items():
             if smoke and exp != 0:
                 continue
-            out.append({"block": "gustavo", "name": k, "got": got[k], "expected": exp})
+            out.append({"block": "exp3", "name": k, "got": got[k], "expected": exp})
     for c in out:
         c["verdict"] = compare.NOT_RUN if c["got"] is None else compare.OK if c["got"] == c["expected"] else compare.OUT
     return out
@@ -196,8 +196,8 @@ def render_markdown(rows, claims, overall, env, ledger, deviations, checks=(), b
         L.append("Nenhuma para os blocos pedidos.")
     L += ["", "## Desvios em relação aos experimentos originais", ""]
     devs = list(deviations)
-    if "gustavo" in blocks:
-        devs.append("Gustavo: a constante `K = 10` em `Gustavo/ICL.py` não é usada; o ICL usa os 3 exemplos "
+    if "exp3" in blocks:
+        devs.append("Gustavo: a constante `K = 10` em `exp3_dpo_icl/ICL.py` não é usada; o ICL usa os 3 exemplos "
                     "gravados por `run_all.py` (`K_ICL = 3`), como no resultado preliminar.")
     L += [f"- {d}" for d in devs] or ["Nenhum."]
     L += ["", "## Ambiente", "", "```json", json.dumps(env, indent=2, ensure_ascii=False), "```"]
@@ -234,7 +234,7 @@ def build_and_write(sources: dict, out_dir: Path, env: dict, ledger: list, devia
         rows = compare.compare_rows(new, base_rows)
         claims = [c for c in compare.check_claims(new) if c["block"] in blocks]
     checks = exact_checks(sources, blocks, smoke)
-    overlap = gustavo_overlap(sources["gustavo"]) if "gustavo" in blocks and sources.get("gustavo") else None
+    overlap = gustavo_overlap(sources["exp3"]) if "exp3" in blocks and sources.get("exp3") else None
     overall = overall_verdict(rows, claims, ledger, smoke, checks)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

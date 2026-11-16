@@ -44,33 +44,33 @@ class OverlapTest(unittest.TestCase):
     def test_without_train_pairs_leak_is_not_verified(self):
         d = Path(tempfile.mkdtemp())
         write_jsonl(d / "test.jsonl", [messages("p1")])
-        checks = {c["name"]: c for c in report.exact_checks({"gustavo": d}, ("gustavo",), smoke=False)}
-        self.assertEqual(checks["gustavo: teste presente no treino"]["verdict"], "NAO_EXECUTADO")
-        self.assertEqual(checks["gustavo: prompts de teste"]["verdict"], "FORA_DA_TOLERANCIA")
+        checks = {c["name"]: c for c in report.exact_checks({"exp3": d}, ("exp3",), smoke=False)}
+        self.assertEqual(checks["exp3: teste presente no treino"]["verdict"], "NAO_EXECUTADO")
+        self.assertEqual(checks["exp3: prompts de teste"]["verdict"], "FORA_DA_TOLERANCIA")
 
     def test_leak_makes_not_reproduced_even_in_smoke(self):
         d = Path(tempfile.mkdtemp())
         write_jsonl(d / "test.jsonl", [messages("p1")])
         write_jsonl(d / "dpo/dpo_control.jsonl", [pair("p1")])
-        res = report.build_and_write({"gustavo": d}, self.out, {}, [], [], smoke=True, blocks=("gustavo",))
+        res = report.build_and_write({"exp3": d}, self.out, {}, [], [], smoke=True, blocks=("exp3",))
         self.assertEqual(res.overall, "NAO_REPRODUZIDO")
 
     def test_judge_invalid_answers_fail(self):
         src = report.preliminary_sources()
         d = Path(tempfile.mkdtemp())
         import shutil
-        shutil.copytree(src["gustavo"], d / "g")
+        shutil.copytree(src["exp3"], d / "g")
         p = d / "g/eval/summary.csv"
         p.write_text(p.read_text(encoding="utf-8").replace("zero_shot,248,0,", "zero_shot,248,3,"), encoding="utf-8")
-        src["gustavo"] = d / "g"
+        src["exp3"] = d / "g"
         res = self.build(src)
         self.assertEqual(res.overall, "NAO_REPRODUZIDO")
 
     def test_only_requested_blocks_are_judged(self):
         src = report.preliminary_sources()
-        res = report.build_and_write(src, self.out, {}, [], [], blocks=("rk",))
-        self.assertEqual({r["block"] for r in res.rows}, {"rk"})
-        self.assertEqual({c["block"] for c in res.claims}, {"rk"})
+        res = report.build_and_write(src, self.out, {}, [], [], blocks=("exp1",))
+        self.assertEqual({r["block"] for r in res.rows}, {"exp1"})
+        self.assertEqual({c["block"] for c in res.claims}, {"exp1"})
         self.assertEqual(res.overall, "REPRODUZIDO")
         self.assertIn("não pedido", (self.out / "REPRODUCAO.md").read_text(encoding="utf-8"))
 
@@ -95,25 +95,25 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(res.overall, "REPRODUZIDO")
         md = (self.out / "REPRODUCAO.md").read_text(encoding="utf-8")
         self.assertIn("REPRODUZIDO", md)
-        self.assertIn("| gustavo: teste presente no treino | 0 | 0 | OK |", md)
-        self.assertIn("| gustavo: prompts únicos de treino DPO | 995 | 995 | OK |", md)
+        self.assertIn("| exp3: teste presente no treino | 0 | 0 | OK |", md)
+        self.assertIn("| exp3: prompts únicos de treino DPO | 995 | 995 | OK |", md)
         with open(self.out / "comparison.csv", encoding="utf-8") as f:
             self.assertEqual(len(list(csv.DictReader(f))), len(res.rows))
 
     def test_missing_run_is_not_run_and_overall_is_partial(self):
         src = report.preliminary_sources()
-        src["davi"] = None
+        src["exp2"] = None
         res = self.build(src)
-        davi = [r for r in res.rows if r["block"] == "davi"]
-        self.assertTrue(davi and all(r["verdict"] == "NAO_EXECUTADO" for r in davi))
+        exp2 = [r for r in res.rows if r["block"] == "exp2"]
+        self.assertTrue(exp2 and all(r["verdict"] == "NAO_EXECUTADO" for r in exp2))
         self.assertEqual(res.overall, "PARCIAL")
         self.assertNotIn("Veredito geral: **REPRODUZIDO**", (self.out / "REPRODUCAO.md").read_text(encoding="utf-8"))
 
     def test_without_gustavo_baseline_is_not_fully_reproduced(self):
         res = report.build_and_write(report.preliminary_sources(), self.out, env={}, ledger=[], deviations=[],
-                                     baseline={"rk": baselines.load_baseline("rk"),
-                                               "davi": baselines.load_baseline("davi"), "gustavo": []})
-        g = [r for r in res.rows if r["block"] == "gustavo"]
+                                     baseline={"exp1": baselines.load_baseline("exp1"),
+                                               "exp2": baselines.load_baseline("exp2"), "exp3": []})
+        g = [r for r in res.rows if r["block"] == "exp3"]
         self.assertTrue(g and all(r["verdict"] == "SEM_BASELINE" for r in g))
         self.assertNotEqual(res.overall, "REPRODUZIDO")
 
@@ -124,7 +124,7 @@ class ReportTest(unittest.TestCase):
             "condition,n,invalid,degraded_%,deg_%_prompts_degrading,deg_%_prompts_safe,avg_words\n"
             "dpo_collapse,248,0,40.0,,,1\n", encoding="utf-8")
         src = report.preliminary_sources()
-        src["gustavo"] = d
+        src["exp3"] = d
         res = self.build(src)
         col = next(r for r in res.rows if r["run"] == "dpo_collapse")
         self.assertEqual(col["verdict"], "FORA_DA_TOLERANCIA")
@@ -132,7 +132,7 @@ class ReportTest(unittest.TestCase):
 
     def test_davi_counts_from_original_logs(self):
         from reproduce.paths import REPO
-        self.assertEqual(report.davi_counts(REPO / "DAVI/solutions/data"), report.DAVI_EXPECTED)
+        self.assertEqual(report.davi_counts(REPO / "exp2_mitigacoes_dataset/solutions/data"), report.DAVI_EXPECTED)
 
     def test_davi_count_mismatch_is_not_reproduced(self):
         d = Path(tempfile.mkdtemp())

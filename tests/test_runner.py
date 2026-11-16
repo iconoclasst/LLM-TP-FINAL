@@ -76,8 +76,8 @@ class RunnerTest(unittest.TestCase):
         self.assertIn("pasta º", log)
 
     def test_marker_names_are_safe(self):
-        self.assertEqual(runner.marker_name(Step(block="rk", name="train:q15__msc__s0", args=[], env="main")),
-                         "rk__train_q15__msc__s0.done")
+        self.assertEqual(runner.marker_name(Step(block="exp1", name="train:q15__msc__s0", args=[], env="main")),
+                         "exp1__train_q15__msc__s0.done")
 
 
 class BlocksTest(unittest.TestCase):

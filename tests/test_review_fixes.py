@@ -17,7 +17,7 @@ class DaviRealScriptTest(unittest.TestCase):
     def test_role_swap_step_runs_from_empty_cwd_and_matches_original_count(self):
         tmp = Path(tempfile.mkdtemp()) / "saída com espaço"
         ctx = ctx_for(tmp)
-        src = Path(__file__).resolve().parents[1] / "Gustavo" / "dataset_degraded_ft.jsonl"   # cópia local, fora do Git
+        src = Path(__file__).resolve().parents[1] / "exp3_dpo_icl" / "dataset_degraded_ft.jsonl"   # cópia local, fora do Git
         if not src.exists():
             self.skipTest("dataset do Gustavo não baixado (rode o reproduce.py ou baixe do Drive)")
         ctx.gustavo_data.mkdir(parents=True)
@@ -27,7 +27,7 @@ class DaviRealScriptTest(unittest.TestCase):
         step = replace(step, env=None)   # só biblioteca padrão: roda com o Python atual
         r = runner.run_steps([step], ctx)
         self.assertEqual(r[0].status, "ok", r[0].log.read_text(encoding="utf-8")[-800:])
-        counts = report.davi_counts(ctx.out / "davi" / "data")
+        counts = report.davi_counts(ctx.out / "exp2" / "data")
         self.assertEqual(counts["role_swap: linhas trocadas"], 1729)
 
 
@@ -71,15 +71,15 @@ class BlocksFixesTest(unittest.TestCase):
     def test_long_resumable_steps_keep_partial(self):
         ctx = ctx_for(Path(tempfile.mkdtemp()))
         keep = {(s.block, s.name) for b in blocks.BUILDERS.values() for s in b(ctx) if s.keep_partial}
-        self.assertEqual(keep, {("rk", "juiz"), ("gustavo", "dpo"), ("gustavo", "juiz")})
+        self.assertEqual(keep, {("exp1", "juiz"), ("exp3", "dpo"), ("exp3", "juiz")})
 
 
 class LedgerTest(unittest.TestCase):
     def test_only_latest_attempt_counts(self):
         p = Path(tempfile.mkdtemp()) / "ledger.jsonl"
-        recs = [{"block": "rk", "step": "a", "status": "falhou", "returncode": 1},
-                {"block": "rk", "step": "b", "status": "ok", "returncode": 0},
-                {"block": "rk", "step": "a", "status": "ok", "returncode": 0}]
+        recs = [{"block": "exp1", "step": "a", "status": "falhou", "returncode": 1},
+                {"block": "exp1", "step": "b", "status": "ok", "returncode": 0},
+                {"block": "exp1", "step": "a", "status": "ok", "returncode": 0}]
         p.write_text("".join(json.dumps(r) + "\n" for r in recs))
         got = cli.read_ledger(p)
         self.assertEqual([(r["step"], r["status"]) for r in got], [("b", "ok"), ("a", "ok")])
@@ -89,14 +89,14 @@ class LedgerTest(unittest.TestCase):
 class PreflightFixesTest(unittest.TestCase):
     def test_exact_ollama_model(self):
         f = nvidia(ollama_models=["qwen3:8b-q8_0"])
-        self.assertIn("ollama_sem_modelo", {i.code for i in preflight.assess(f, ("gustavo",))})
+        self.assertIn("ollama_sem_modelo", {i.code for i in preflight.assess(f, ("exp3",))})
 
     def test_linux_without_vulkan_blocks_rk_only(self):
-        issues = preflight.assess(nvidia(vulkan=False), ("rk", "davi"))
-        self.assertEqual({(i.block, i.code) for i in issues if i.level == "BLOQUEIO"}, {("rk", "sem_vulkan")})
+        issues = preflight.assess(nvidia(vulkan=False), ("exp1", "exp2"))
+        self.assertEqual({(i.block, i.code) for i in issues if i.level == "BLOQUEIO"}, {("exp1", "sem_vulkan")})
         self.assertNotIn("sem_vulkan", {i.code for i in preflight.assess(
-            nvidia(vulkan=False, llama_server_env=True), ("rk",))})
-        self.assertNotIn("sem_vulkan", {i.code for i in preflight.assess(mac(), ("rk",))})
+            nvidia(vulkan=False, llama_server_env=True), ("exp1",))})
+        self.assertNotIn("sem_vulkan", {i.code for i in preflight.assess(mac(), ("exp1",))})
 
 
 class GustavoJudgeTest(unittest.TestCase):

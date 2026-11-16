@@ -43,8 +43,8 @@ class VerdictTest(unittest.TestCase):
 
 class CompareRowsTest(unittest.TestCase):
     def test_sd_comes_from_baseline_seeds_of_same_group(self):
-        base = [row("rk", f"q15__msc__s{i}", "msc", "pl_lp", v) for i, v in enumerate([70.0, 85.0, 96.0])]
-        new = [row("rk", "q15__msc__s0", "msc", "pl_lp", 95.0)]
+        base = [row("exp1", f"q15__msc__s{i}", "msc", "pl_lp", v) for i, v in enumerate([70.0, 85.0, 96.0])]
+        new = [row("exp1", "q15__msc__s0", "msc", "pl_lp", 95.0)]
         out = {r["run"]: r for r in compare.compare_rows(new, base)}
         # sd das 3 seeds ~13.0 -> tolerância ~26 > piso 10
         self.assertGreater(out["q15__msc__s0"]["tolerance"], 20)
@@ -52,26 +52,26 @@ class CompareRowsTest(unittest.TestCase):
         self.assertEqual(out["q15__msc__s1"]["verdict"], "NAO_EXECUTADO")
 
     def test_new_without_baseline(self):
-        new = [row("gustavo", "icl_safe", "icl_safe", "deg", 1.0)]
+        new = [row("exp3", "icl_safe", "icl_safe", "deg", 1.0)]
         out = compare.compare_rows(new, [])
         self.assertEqual(out[0]["verdict"], "SEM_BASELINE")
         self.assertIsNone(out[0]["baseline"])
 
     def test_output_keys(self):
-        out = compare.compare_rows([row("davi", "untuned", "untuned", "csqa", 71.0)],
-                                   [row("davi", "untuned", "untuned", "csqa", 71.2)])
+        out = compare.compare_rows([row("exp2", "untuned", "untuned", "csqa", 71.0)],
+                                   [row("exp2", "untuned", "untuned", "csqa", 71.2)])
         self.assertEqual(set(out[0]), {"block", "run", "metric", "new", "baseline", "tolerance", "verdict"})
         self.assertEqual(out[0]["verdict"], "OK")
 
 
 class ClaimsTest(unittest.TestCase):
     def rk_rows(self, helpful, control):
-        rows = [row("rk", "q15__base", "base", "pl_s", 92.7), row("rk", "q15__base", "base", "cim", 69.0)]
+        rows = [row("exp1", "q15__base", "base", "pl_s", 92.7), row("exp1", "q15__base", "base", "cim", 69.0)]
         for s in range(3):
-            rows.append(row("rk", f"q15__synth_helpful__s{s}", "synth_helpful", "pl_s", helpful[s]))
-            rows.append(row("rk", f"q15__synth_control__s{s}", "synth_control", "pl_s", control[s]))
-            rows.append(row("rk", f"q15__dialogsum__s{s}", "dialogsum", "cim", 50.0))
-            rows.append(row("rk", f"q15__dialogsum__s{s}", "dialogsum", "pl_s", 77.0))
+            rows.append(row("exp1", f"q15__synth_helpful__s{s}", "synth_helpful", "pl_s", helpful[s]))
+            rows.append(row("exp1", f"q15__synth_control__s{s}", "synth_control", "pl_s", control[s]))
+            rows.append(row("exp1", f"q15__dialogsum__s{s}", "dialogsum", "cim", 50.0))
+            rows.append(row("exp1", f"q15__dialogsum__s{s}", "dialogsum", "pl_s", 77.0))
         return rows
 
     def by_id(self, claims):
@@ -93,9 +93,9 @@ class ClaimsTest(unittest.TestCase):
         self.assertIsNone(c["gustavo_collapse_gt_control"])
 
     def test_gustavo_and_davi_claims(self):
-        rows = [row("gustavo", n, n, "deg", v) for n, v in
+        rows = [row("exp3", n, n, "deg", v) for n, v in
                 [("dpo_collapse", 65.7), ("dpo_control", 0.0), ("zero_shot", 0.0)]]
-        rows += [row("davi", n, n, "pl_s", v) for n, v in
+        rows += [row("exp2", n, n, "pl_s", v) for n, v in
                  [("degraded_s0", 43.4), ("nopii_ft_s0", 49.4), ("role_swap_ft_v2_s0", 50.0)]]
         c = self.by_id(compare.check_claims(rows))
         self.assertTrue(c["gustavo_collapse_gt_control"])
@@ -145,8 +145,8 @@ class ExtractTest(unittest.TestCase):
         self.assertEqual(got, {("original", "deg"): 100.0, ("icl_safe", "deg"): 1.2})
 
     def test_baseline_roundtrip(self):
-        rows = [row("rk", "q15__base", "base", "pl_s", 92.74536766261402)]
-        p = self.tmp / "rk.csv"
+        rows = [row("exp1", "q15__base", "base", "pl_s", 92.74536766261402)]
+        p = self.tmp / "exp1.csv"
         baselines.write_csv(rows, p)
         self.assertEqual(baselines.read_csv(p), rows)
 
@@ -155,7 +155,7 @@ class VersionedBaselinesTest(unittest.TestCase):
     """Os CSVs versionados batem com a tabela preliminar do Rubens/Kayque e com o summary do Gustavo."""
 
     def test_rk_means_match_summary_original(self):
-        rows = baselines.load_baseline("rk")
+        rows = baselines.load_baseline("exp1")
         self.assertEqual(len({r["run"] for r in rows}), 34)
         def mean(group, metric):
             v = [r["value"] for r in rows if r["group"] == group and r["metric"] == metric]
@@ -169,9 +169,9 @@ class VersionedBaselinesTest(unittest.TestCase):
     def test_all_60_cells_of_summary_original(self):
         import math
         from reproduce.paths import REPO
-        md = (REPO / "RUBENS_KAYQUE/reproducao_tabela_resultados/experiments/results/summary_original.md"
+        md = (REPO / "exp1_reproducao_colapso/reproducao_tabela_resultados/experiments/results/summary_original.md"
               ).read_text(encoding="utf-8").splitlines()
-        rows = baselines.load_baseline("rk")
+        rows = baselines.load_baseline("exp1")
         cols = {"pl_lp": 4, "pl_s": 6, "sem": 8, "cim": 10, "csqa": 12}
         n = 0
         for line in md:
@@ -191,12 +191,12 @@ class VersionedBaselinesTest(unittest.TestCase):
         self.assertEqual(n, 60)
 
     def test_gustavo_baseline(self):
-        got = {r["run"]: r["value"] for r in baselines.load_baseline("gustavo")}
+        got = {r["run"]: r["value"] for r in baselines.load_baseline("exp3")}
         self.assertEqual(got, {"original": 100.0, "zero_shot": 0.0, "icl_degrading": 2.8,
                                "icl_safe": 1.2, "dpo_collapse": 65.7, "dpo_control": 0.0})
 
     def test_davi_baseline(self):
-        got = {(r["run"], r["metric"]) for r in baselines.load_baseline("davi")}
+        got = {(r["run"], r["metric"]) for r in baselines.load_baseline("exp2")}
         self.assertIn(("untuned", "csqa"), got)
         self.assertIn(("role_swap_ft_v2_s0", "pl_s"), got)
         self.assertEqual(len(got), 4 + 3 * 2)

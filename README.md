@@ -9,9 +9,9 @@ O repositório reúne três trabalhos, todos sobre o Qwen2.5-1.5B-Instruct:
 
 | Pasta | Pergunta | Resultado principal (preliminar) |
 |---|---|---|
-| `RUBENS_KAYQUE/` | O colapso aparece num modelo de 1,5 B treinado com LoRA? E em 6 datasets novos? | PrivacyLens amostrado cai de 92,7% para 45,2% com o `synth_helpful` do artigo, abaixo do controle nas 3 seeds; o dataset novo `msc` causa a segunda maior queda (51,7%) |
-| `DAVI/` | Remover PII ou trocar papéis no dataset prestativo atenua o colapso? | PrivacyLens amostrado: `degraded` 43,4%, `nopii_ft` 49,4%, `role_swap_ft_v2` 50,0% (seed 0) |
-| `Gustavo/` | Otimização de preferência (DPO) ou ICL com respostas degradantes induzem o colapso? | Respostas degradantes: `dpo_collapse` 65,7%, `dpo_control` 0%, ICL ≤ 2,8% (248 prompts, sem vazamento treino/teste) |
+| `exp1_reproducao_colapso/` | O colapso aparece num modelo de 1,5 B treinado com LoRA? E em 6 datasets novos? | PrivacyLens amostrado cai de 92,7% para 45,2% com o `synth_helpful` do artigo, abaixo do controle nas 3 seeds; o dataset novo `msc` causa a segunda maior queda (51,7%) |
+| `exp2_mitigacoes_dataset/` | Remover PII ou trocar papéis no dataset prestativo atenua o colapso? | PrivacyLens amostrado: `degraded` 43,4%, `nopii_ft` 49,4%, `role_swap_ft_v2` 50,0% (seed 0) |
+| `exp3_dpo_icl/` | Otimização de preferência (DPO) ou ICL com respostas degradantes induzem o colapso? | Respostas degradantes: `dpo_collapse` 65,7%, `dpo_control` 0%, ICL ≤ 2,8% (248 prompts, sem vazamento treino/teste) |
 
 ## Reproduzir com um comando
 
@@ -31,7 +31,7 @@ O relatório final sai em `outputs/REPRODUCAO.md`, com veredito por métrica e p
 | Opção | O que faz |
 |---|---|
 | `--check` | mostra requisitos, empecilhos, plano e estimativas; não executa nada |
-| `--only rk\|davi\|gustavo` | roda só um bloco (pode repetir) |
+| `--only exp1\|exp2\|exp3` | roda só um bloco (pode repetir) |
 | `--smoke` | poucos itens e passos, saída em `outputs/smoke/`; nunca compara com o baseline |
 | `--report-only` | só refaz a comparação e o relatório a partir de `outputs/` (com `--smoke`, de `outputs/smoke/`) |
 | `--report-only --preliminary` | compara os resultados preliminares versionados com os baselines (autoverificação, segundos, sem GPU) |
@@ -47,7 +47,7 @@ ponto em que parou, sem refazer etapas concluídas.
 |---|---|---|
 | Python ≥ 3.9 e `curl` | iniciar o controlador e baixar os insumos | já vêm no macOS e na maioria dos Linux |
 | Python 3.12, `uv` ou `conda` | criar os ambientes | se não houver nenhum: <https://docs.astral.sh/uv/getting-started/installation/> |
-| **Ollama** + modelo `qwen3:8b` | juiz do bloco `gustavo` | <https://ollama.com/download>, depois `ollama pull qwen3:8b` (~5,2 GB). **O controlador não instala o Ollama**; sem ele, só o bloco `gustavo` é bloqueado |
+| **Ollama** + modelo `qwen3:8b` | juiz do bloco `exp3` | <https://ollama.com/download>, depois `ollama pull qwen3:8b` (~5,2 GB). **O controlador não instala o Ollama**; sem ele, só o bloco `exp3` é bloqueado |
 | GPU NVIDIA com 8 GB de VRAM (recomendado) | reproduzir os números | sem ela, roda em MPS ou CPU, com desvios registrados e tempo bem maior |
 | ~32 GB livres em disco | ambientes, modelos e saídas | `--check` mostra o necessário e o disponível |
 
@@ -59,9 +59,9 @@ insumos em `artifacts/` e o llama.cpp b11505. Modelos do Hugging Face vão para 
 
 | Bloco | Tempo | Origem |
 |---|---|---|
-| `rk` | 21–22 h | medido (RTX 4060 / RX 7600) |
-| `davi` | ~1 h | medido (T4 do Colab) |
-| `gustavo` | 4–10 h | estimativa, sem medição |
+| `exp1` | 21–22 h | medido (RTX 4060 / RX 7600) |
+| `exp2` | ~1 h | medido (T4 do Colab) |
+| `exp3` | 4–10 h | estimativa, sem medição |
 
 Em MPS e CPU não há medição. Detalhes em [`docs/PIPELINE.md`](docs/PIPELINE.md).
 
@@ -114,9 +114,9 @@ Todos os dados são públicos; não há dado de acesso restrito.
 A reprodução completa custa mais de 25 h de GPU. Por isso, os resultados preliminares estão
 versionados em `resultados_preliminares/` (~18 MB):
 
-- `rk/results/`: um JSON por run e benchmark (PrivacyLens, PL semântico, CIMemories com as respostas, CSQA), mais `summary.md` e `timing.md`; `rk/runs/*/train_meta.json`: tempo e loss dos 33 treinos;
-- `davi/eval_results/`: PrivacyLens e CSQA por run, com os registros item a item;
-- `gustavo/`: `test.jsonl`, pares DPO, exemplos do ICL, julgamentos item a item das 6 condições e `eval/summary.csv`.
+- `exp1/results/`: um JSON por run e benchmark (PrivacyLens, PL semântico, CIMemories com as respostas, CSQA), mais `summary.md` e `timing.md`; `exp1/runs/*/train_meta.json`: tempo e loss dos 33 treinos;
+- `exp2/eval_results/`: PrivacyLens e CSQA por run, com os registros item a item;
+- `exp3/`: `test.jsonl`, pares DPO, exemplos do ICL, julgamentos item a item das 6 condições e `eval/summary.csv`.
 
 `reproduce/baselines/*.csv` resume essas métricas. Para conferir, sem GPU, que esses arquivos
 reproduzem a tabela publicada:
@@ -136,7 +136,7 @@ reproduce/pins.toml          revisões de modelos/datasets, llama.cpp e hashes
 reproduce/manifest.tsv       insumos do Drive com SHA-256
 reproduce/baselines/         métricas preliminares em CSV
 resultados_preliminares/     saídas preliminares que sustentam os números
-RUBENS_KAYQUE/ DAVI/ Gustavo/  código de cada trabalho
+exp1_reproducao_colapso/ exp2_mitigacoes_dataset/ exp3_dpo_icl/  código de cada trabalho
 docs/PIPELINE.md             pipeline em detalhe, tempos, desvios, solução de problemas
 tests/                       testes do controlador (python3 -m unittest discover tests)
 ```

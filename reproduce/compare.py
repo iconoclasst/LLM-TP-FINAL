@@ -71,12 +71,12 @@ def compare_rows(new: list[dict], base: list[dict]) -> list[dict]:
 # ---------- afirmações dos relatórios ----------
 
 CLAIMS = [
-    ("rk_helpful_lt_control", "rk", "PrivacyLens amostrado: synth_helpful < synth_control em cada seed"),
-    ("rk_ft_below_base", "rk", "PrivacyLens amostrado: todo fine-tune (média das seeds) abaixo do modelo base"),
-    ("rk_dialogsum_cim_below_base", "rk", "CIMemories: dialogsum abaixo do modelo base nas 3 seeds"),
-    ("davi_degraded_lowest", "davi", "PrivacyLens amostrado: degraded abaixo de nopii_ft e de role_swap_ft_v2"),
-    ("gustavo_collapse_gt_control", "gustavo", "Respostas degradantes: dpo_collapse > dpo_control"),
-    ("gustavo_collapse_gt_zero_shot", "gustavo", "Respostas degradantes: dpo_collapse > zero_shot"),
+    ("rk_helpful_lt_control", "exp1", "PrivacyLens amostrado: synth_helpful < synth_control em cada seed"),
+    ("rk_ft_below_base", "exp1", "PrivacyLens amostrado: todo fine-tune (média das seeds) abaixo do modelo base"),
+    ("rk_dialogsum_cim_below_base", "exp1", "CIMemories: dialogsum abaixo do modelo base nas 3 seeds"),
+    ("davi_degraded_lowest", "exp2", "PrivacyLens amostrado: degraded abaixo de nopii_ft e de role_swap_ft_v2"),
+    ("gustavo_collapse_gt_control", "exp3", "Respostas degradantes: dpo_collapse > dpo_control"),
+    ("gustavo_collapse_gt_zero_shot", "exp3", "Respostas degradantes: dpo_collapse > zero_shot"),
 ]
 
 
@@ -98,21 +98,21 @@ def check_claims(rows: list[dict]) -> list[dict]:
     v = lambda block, run, metric: _value(rows, block, run, metric)
     res = {}
     res["rk_helpful_lt_control"] = _all_or_none(
-        [(v("rk", f"q15__synth_helpful__s{s}", "pl_s"), v("rk", f"q15__synth_control__s{s}", "pl_s"))
+        [(v("exp1", f"q15__synth_helpful__s{s}", "pl_s"), v("exp1", f"q15__synth_control__s{s}", "pl_s"))
          for s in range(3)])
-    base = v("rk", "q15__base", "pl_s")
+    base = v("exp1", "q15__base", "pl_s")
     groups = defaultdict(list)
     for r in rows:
-        if r["block"] == "rk" and r["metric"] == "pl_s" and r["group"] != "base":
+        if r["block"] == "exp1" and r["metric"] == "pl_s" and r["group"] != "base":
             groups[r["group"]].append(r["value"])
     res["rk_ft_below_base"] = _all_or_none([(sum(x) / len(x), base) for x in groups.values()])
-    cim_base = v("rk", "q15__base", "cim")
+    cim_base = v("exp1", "q15__base", "cim")
     res["rk_dialogsum_cim_below_base"] = _all_or_none(
-        [(v("rk", f"q15__dialogsum__s{s}", "cim"), cim_base) for s in range(3)])
-    deg = v("davi", "degraded_s0", "pl_s")
+        [(v("exp1", f"q15__dialogsum__s{s}", "cim"), cim_base) for s in range(3)])
+    deg = v("exp2", "degraded_s0", "pl_s")
     res["davi_degraded_lowest"] = _all_or_none(
-        [(deg, v("davi", "nopii_ft_s0", "pl_s")), (deg, v("davi", "role_swap_ft_v2_s0", "pl_s"))])
-    col = v("gustavo", "dpo_collapse", "deg")
-    res["gustavo_collapse_gt_control"] = _all_or_none([(v("gustavo", "dpo_control", "deg"), col)])
-    res["gustavo_collapse_gt_zero_shot"] = _all_or_none([(v("gustavo", "zero_shot", "deg"), col)])
+        [(deg, v("exp2", "nopii_ft_s0", "pl_s")), (deg, v("exp2", "role_swap_ft_v2_s0", "pl_s"))])
+    col = v("exp3", "dpo_collapse", "deg")
+    res["gustavo_collapse_gt_control"] = _all_or_none([(v("exp3", "dpo_control", "deg"), col)])
+    res["gustavo_collapse_gt_zero_shot"] = _all_or_none([(v("exp3", "zero_shot", "deg"), col)])
     return [{"id": cid, "block": block, "text": text, "holds": res[cid]} for cid, block, text in CLAIMS]

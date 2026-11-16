@@ -50,7 +50,7 @@ class Facts:
 @dataclass
 class Issue:
     level: str        # BLOQUEIO | AVISO
-    block: str        # rk | davi | gustavo | geral
+    block: str        # exp1 | exp2 | exp3 | geral
     code: str
     message: str
     fix: str = ""
@@ -170,8 +170,8 @@ def assess(f: Facts, blocks, smoke: bool = False) -> list[Issue]:
                        f"Sem GPU NVIDIA: vai rodar em {choose_device(f).upper()}. Os resultados preliminares foram "
                        "obtidos em GPU; espere pequenos desvios numéricos e tempo maior.",
                        "Para reproduzir de fato, use uma máquina com GPU NVIDIA (8 GB de VRAM bastam)."))
-        if "gustavo" in blocks:
-            I.append(Issue("AVISO", "gustavo", "sem_4bit",
+        if "exp3" in blocks:
+            I.append(Issue("AVISO", "exp3", "sem_4bit",
                            "Sem CUDA não há quantização em 4 bits (bitsandbytes): o DPO e o ICL do Gustavo carregam o "
                            "modelo sem quantizar. O relatório registra esse desvio."))
         if not f.mps and not smoke:
@@ -184,25 +184,25 @@ def assess(f: Facts, blocks, smoke: bool = False) -> list[Issue]:
     if f.os == "Windows":
         I.append(Issue("AVISO", "geral", "windows", "Windows não foi testado com este controlador.",
                        "Se algo falhar, use WSL2 ou Linux."))
-    if "rk" in blocks and f.vulkan is False and not f.llama_server_env:
-        I.append(Issue("BLOQUEIO", "rk", "sem_vulkan",
+    if "exp1" in blocks and f.vulkan is False and not f.llama_server_env:
+        I.append(Issue("BLOQUEIO", "exp1", "sem_vulkan",
                        "O juiz do Rubens/Kayque usa o llama.cpp b11505 com Vulkan, mas libvulkan.so.1 não foi "
                        "encontrada. Sem ela, o juiz falharia depois de ~17 h de treino.",
                        "Instale o Vulkan e o ICD da NVIDIA (ex.: `sudo apt install libvulkan1` e o driver NVIDIA "
                        "completo) ou defina LLAMA_SERVER com um llama-server b11505 compilado com CUDA."))
-    if "gustavo" in blocks:
+    if "exp3" in blocks:
         install = (f"Instale o Ollama (https://ollama.com/download), deixe-o aberto (ou rode `ollama serve`) e "
                    f"baixe o juiz: `ollama pull {OLLAMA_MODEL}` (cerca de 5,2 GB). O controlador não instala o "
                    "Ollama por conta própria.")
         if not f.ollama and not f.ollama_running:
-            I.append(Issue("BLOQUEIO", "gustavo", "sem_ollama",
+            I.append(Issue("BLOQUEIO", "exp3", "sem_ollama",
                            "O juiz do Gustavo precisa do Ollama, que não está instalado.", install))
         elif not f.ollama_running:
-            I.append(Issue("BLOQUEIO", "gustavo", "ollama_parado",
+            I.append(Issue("BLOQUEIO", "exp3", "ollama_parado",
                            f"O Ollama está instalado, mas não responde em {OLLAMA_URL}.",
                            "Abra o aplicativo do Ollama ou rode `ollama serve` em outro terminal."))
         elif not has_ollama_model(f):
-            I.append(Issue("BLOQUEIO", "gustavo", "ollama_sem_modelo",
+            I.append(Issue("BLOQUEIO", "exp3", "ollama_sem_modelo",
                            f"O Ollama está rodando, mas o modelo {OLLAMA_MODEL} não foi baixado.",
                            f"Rode `ollama pull {OLLAMA_MODEL}` (cerca de 5,2 GB)."))
     I.append(Issue("AVISO", "geral", "nao_validado",
@@ -248,11 +248,11 @@ def render(f: Facts, issues: list[Issue], blocks, smoke: bool) -> str:
         L.append(f"  - {desc}: ~{gb:g} GB".replace(".", ","))
     if not (f.python312 or f.conda):
         L.append("  - Python 3.12 via uv (~0,1 GB)")
-    if "gustavo" in blocks:
+    if "exp3" in blocks:
         L.append("Você precisa instalar por conta própria: Ollama + `ollama pull qwen3:8b` (~5,2 GB).")
     L += ["", f"Plano ({'--smoke: poucos itens, sem comparação' if smoke else 'execução completa'}):",
           "  Bloco     | Situação      | Tempo estimado       | Origem da estimativa"]
-    for b in ("rk", "davi", "gustavo"):
+    for b in ("exp1", "exp2", "exp3"):
         if b not in blocks:
             L.append(f"  {b:<9} | não pedido    |                      |")
             continue

@@ -14,10 +14,10 @@ critérios de verificação e solução de problemas estão em [`docs/PIPELINE.m
 | `reproduce/manifest.tsv` | Arquivos baixados do Google Drive (datasets, CIMemories, prompts), com SHA-256 |
 | `reproduce/baselines/` | Métricas dos resultados preliminares em CSV, usadas na comparação |
 | `reproduce/steps/` | Pequenos scripts usados pelo controlador: download do HF, llama.cpp e wrappers dos juízes |
-| `RUBENS_KAYQUE/reproducao_tabela_resultados/` | Experimento 1: reprodução do *Privacy Collapse* com LoRA no Qwen2.5-1.5B em 11 datasets × 3 seeds, avaliado em PrivacyLens, CIMemories e CSQA. Scripts em `experiments/scripts/` |
-| `DAVI/solutions/` | Experimento 2: mitigações no dataset prestativo. `gen_datasets/` gera as versões sem PII e com troca de papéis; `src/fine_tune_models.py` treina; `benchmarks/` avalia (PrivacyLens e CSQA); `data/*/logs.txt` guarda as contagens originais das transformações |
-| `DAVI/logit_lens/` | Experimento 2 (análise): logit lens entre Qwen2.5-0.5B e 0.5B-Instruct |
-| `Gustavo/` | Experimento 3: `run_all.py` monta os pares e treina o DPO (`collapse` e `control`); `ICL.py` gera as respostas das 3 condições de ICL; `Tester.py` julga as 6 condições com o `qwen3:8b` no Ollama. `make_pairs.py` e `train_dpo.py` são versões anteriores, não usadas pelo controlador |
+| `exp1_reproducao_colapso/reproducao_tabela_resultados/` | Experimento 1: reprodução do *Privacy Collapse* com LoRA no Qwen2.5-1.5B em 11 datasets × 3 seeds, avaliado em PrivacyLens, CIMemories e CSQA. Scripts em `experiments/scripts/` |
+| `exp2_mitigacoes_dataset/solutions/` | Experimento 2: mitigações no dataset prestativo. `gen_datasets/` gera as versões sem PII e com troca de papéis; `src/fine_tune_models.py` treina; `benchmarks/` avalia (PrivacyLens e CSQA); `data/*/logs.txt` guarda as contagens originais das transformações |
+| `exp2_mitigacoes_dataset/logit_lens/` | Experimento 2 (análise): logit lens entre Qwen2.5-0.5B e 0.5B-Instruct |
+| `exp3_dpo_icl/` | Experimento 3: `run_all.py` monta os pares e treina o DPO (`collapse` e `control`); `ICL.py` gera as respostas das 3 condições de ICL; `Tester.py` julga as 6 condições com o `qwen3:8b` no Ollama. `make_pairs.py` e `train_dpo.py` são versões anteriores, não usadas pelo controlador |
 | `resultados_preliminares/` | Resultados já obtidos pela equipe (JSONs por run, julgamentos, `summary.csv`). Servem de evidência dos números e de baseline |
 | `Descricoes_experimentos/` | Resumo dos resultados do experimento 1 (PDF) |
 | `docs/PIPELINE.md` | Pipeline em detalhe: etapas, tolerâncias, tempos, desvios e solução de problemas |
@@ -77,14 +77,14 @@ python3 reproduce.py
 
 - Para rodar sem supervisão, sem a pergunta de confirmação: `python3 reproduce.py --yes`.
 - Pode interromper com Ctrl+C. Rodando o mesmo comando de novo, ele continua do ponto em que parou.
-- Para rodar só um experimento: `--only rk`, `--only davi` ou `--only gustavo`.
+- Para rodar só um experimento: `--only exp1`, `--only exp2` ou `--only exp3`.
 
 **6. Veja o resultado.**
 
 - `outputs/REPRODUCAO.md`: veredito geral (`REPRODUZIDO`, `PARCIAL` ou `NAO_REPRODUZIDO`), conclusões dos relatórios, verificações exatas e a tabela de cada métrica, novo × preliminar;
 - `outputs/comparison.csv`: a mesma comparação em CSV;
 - `outputs/environment.json`: sistema, GPU e versões de todos os pacotes;
-- `outputs/rk/`, `outputs/davi/` e `outputs/gustavo/`: resultados completos de cada experimento;
+- `outputs/exp1/`, `outputs/exp2/` e `outputs/exp3/`: resultados completos de cada experimento;
 - `outputs/logs/`: um log por etapa, útil para investigar falhas.
 
 Para refazer só o relatório: `python3 reproduce.py --report-only`.
