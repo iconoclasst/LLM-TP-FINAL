@@ -1,9 +1,9 @@
 """Etapas de cada bloco, com os mesmos comandos e hiperparâmetros dos experimentos originais.
 
-Rubens/Kayque: README de exp1_reproducao_colapso/reproducao_tabela_resultados (run_pipeline.py, run_judge.py).
-Davi: comandos dos notebooks do Colab (LLM_privacy_fine_tunings.ipynb e privacy_runs_benchmarks.ipynb,
+Experimento 1: README de exp1_reproducao_colapso/reproducao_tabela_resultados (run_pipeline.py, run_judge.py).
+Experimento 2: comandos dos notebooks do Colab (LLM_privacy_fine_tunings.ipynb e privacy_runs_benchmarks.ipynb,
 não versionados), reproduzidos aqui.
-Gustavo: run_all.py -> ICL.py -> Tester.py.
+Experimento 3: run_all.py -> ICL.py -> Tester.py.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ RK_DATASETS = ["synth_helpful", "synth_control", "gsm8k", "empathetic", "support
 RK_SCRIPTS = REPO / "exp1_reproducao_colapso" / "reproducao_tabela_resultados" / "experiments" / "scripts"
 DAVI = REPO / "exp2_mitigacoes_dataset"
 GUSTAVO = REPO / "exp3_dpo_icl"
-DAVI_RUNS = {   # run -> dataset de treino (relativo a outputs/exp2; o degraded é o dataset do Gustavo, baixado do Drive)
+DAVI_RUNS = {   # run -> dataset de treino (relativo a outputs/exp2; o degraded é o dataset do Experimento 3, baixado do Drive)
     "degraded": None,
     "nopii_ft": Path("data/pii_removal/dataset_nopii_ft.jsonl"),
     "role_swap_ft_v2": Path("data/role_swap/v2/dataset_role_swap_ft_v2.jsonl"),
@@ -44,7 +44,7 @@ class Context:
 
     @property
     def gustavo_data(self) -> Path:
-        """Datasets do Gustavo (dataset_degraded_ft.jsonl e dataset_safe_ft.jsonl), baixados do Drive."""
+        """Datasets do Experimento 3 (dataset_degraded_ft.jsonl e dataset_safe_ft.jsonl), baixados do Drive."""
         return self.art / "exp3"
 
     @property
@@ -73,7 +73,7 @@ def _hf_step(block, ctx, models, privacylens=False, gguf=False, csqa=False):
                 description="baixa modelos e dados do Hugging Face nas revisões fixadas")
 
 
-# ---------- Rubens/Kayque ----------
+# ---------- Experimento 1 ----------
 
 def build_rk(ctx: Context) -> list[Step]:
     out = ctx.out / "exp1"
@@ -123,7 +123,7 @@ def build_rk(ctx: Context) -> list[Step]:
     return steps
 
 
-# ---------- Davi ----------
+# ---------- Experimento 2 ----------
 
 def build_davi(ctx: Context) -> list[Step]:
     out = ctx.out / "exp2"
@@ -170,7 +170,7 @@ def build_davi(ctx: Context) -> list[Step]:
     return steps
 
 
-# ---------- Gustavo ----------
+# ---------- Experimento 3 ----------
 
 def build_gustavo(ctx: Context) -> list[Step]:
     out = ctx.out / "exp3"

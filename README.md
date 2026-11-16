@@ -75,7 +75,7 @@ pip install -r requirements.txt
 pip install -r reproduce/requirements/cuda.txt        # só com CUDA (bitsandbytes)
 ```
 
-A remoção de PII do Davi usa um ambiente separado, porque o Presidio exige `numpy<2.5`:
+A remoção de PII do Experimento 2 usa um ambiente separado, porque o Presidio exige `numpy<2.5`:
 `reproduce/requirements/pii.txt`. Todas as versões estão fixadas em `reproduce/requirements/`, e as
 revisões de modelos e datasets em `reproduce/pins.toml`.
 
@@ -88,7 +88,7 @@ Nenhuma é obrigatória e nenhum segredo é necessário: modelos e dados são p�
 | `HF_HOME` | cache do Hugging Face (padrão: `artifacts/hf/`) |
 | `HF_TOKEN` | opcional; só acelera downloads do Hugging Face. Nunca o coloque no repositório |
 | `OLLAMA_HOST` | endereço do Ollama (padrão: `http://127.0.0.1:11434`) |
-| `LLAMA_SERVER`, `JUDGE_GGUF` | usar um llama-server ou GGUF próprios no juiz do Rubens/Kayque |
+| `LLAMA_SERVER`, `JUDGE_GGUF` | usar um llama-server ou GGUF próprios no juiz do Experimento 1 |
 | `REPRO_ARTIFACTS`, `REPRO_OUTPUTS`, `REPRO_ENVS` | mudar onde ficam insumos, saídas e ambientes (por exemplo, em outro disco) |
 
 O controlador lê essas variáveis do ambiente em tempo de execução. Ele não lê o `.env` sozinho:
@@ -101,11 +101,11 @@ verificação de SHA-256:
 
 | Insumo | Onde fica |
 |---|---|
-| Datasets de fine-tuning do Rubens/Kayque (11), CIMemories, prompts do logit lens | Google Drive público: <https://drive.google.com/drive/folders/1xeiQu2GcCBrb2AdD8SboZfQ3BiLRGrCw>; ids e hashes em `reproduce/manifest.tsv` |
+| Datasets de fine-tuning do Experimento 1 (11), CIMemories, prompts do logit lens | Google Drive público: <https://drive.google.com/drive/folders/1xeiQu2GcCBrb2AdD8SboZfQ3BiLRGrCw>; ids e hashes em `reproduce/manifest.tsv` |
 | PrivacyLens (`main_data.json`, 493 cenários) | Hugging Face `SALT-NLP/PrivacyLens`, revisão fixada |
 | Qwen2.5-1.5B-Instruct, Qwen2.5-0.5B(-Instruct), Qwen3-8B-GGUF | Hugging Face, revisões fixadas |
 | CommonSenseQA | Hugging Face `tau/commonsense_qa`, revisão fixada |
-| Datasets do Gustavo (`dataset_degraded_ft.jsonl`, `dataset_safe_ft.jsonl`), usados também pelo Davi | Google Drive, pasta `Gustavo/`; ids e hashes em `reproduce/manifest.tsv` |
+| Datasets do Experimento 3 (`dataset_degraded_ft.jsonl`, `dataset_safe_ft.jsonl`), usados também pelo Experimento 2 | Google Drive, pasta `Gustavo/`; ids e hashes em `reproduce/manifest.tsv` |
 
 Todos os dados são públicos; não há dado de acesso restrito.
 
@@ -147,6 +147,6 @@ tests/                       testes do controlador (python3 -m unittest discover
   `--check` e `--report-only` num Mac. O `--smoke` e a execução completa em GPU ainda precisam ser
   rodados numa máquina com NVIDIA.
 - Resultados idênticos bit a bit não são esperados: as seeds preliminares misturam AMD e NVIDIA, e
-  o Davi usou Colab com outra versão do torch. Por isso a comparação usa tolerâncias (ver `docs/PIPELINE.md`).
-- Fora da CUDA, o Gustavo roda sem quantização em 4 bits e o Davi treina em float32. Esses desvios
+  o Experimento 2 usou Colab com outra versão do torch. Por isso a comparação usa tolerâncias (ver `docs/PIPELINE.md`).
+- Fora da CUDA, o Experimento 3 roda sem quantização em 4 bits e o Experimento 2 treina em float32. Esses desvios
   são registrados no relatório.

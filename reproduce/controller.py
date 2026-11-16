@@ -21,23 +21,23 @@ def deviations(device: str, run_blocks) -> list[str]:
         d.append(f"Executado em {device.upper()}, não em GPU NVIDIA como os resultados preliminares; "
                  "pequenas diferenças numéricas são esperadas.")
     if "exp1" in run_blocks:
-        d.append("Rubens/Kayque: a seed 0 original foi treinada em AMD (ROCm) e as seeds 1–2 em NVIDIA; "
+        d.append("Experimento 1: a seed 0 original foi treinada em AMD (ROCm) e as seeds 1–2 em NVIDIA; "
                  "o torch aqui é o 2.9.1 do lock" + ("" if device == "cuda" else
                  "; o juiz usa o llama.cpp b11505 nativo da plataforma, não o build Vulkan do Windows") +
                  ("; treino e avaliação mantêm bf16, como no original, o que em CPU é lento" if device == "cpu" else "")
                  + ".")
     if "exp2" in run_blocks:
-        d.append("Davi: o baseline foi obtido no Colab (T4) com torch 2.11 sem versões fixadas; aqui se usa "
-                 "o lock do Rubens/Kayque (torch 2.9.1, transformers 5.19.0).")
+        d.append("Experimento 2: o baseline foi obtido no Colab (T4) com torch 2.11 sem versões fixadas; aqui se usa "
+                 "o lock do Experimento 1 (torch 2.9.1, transformers 5.19.0).")
         if device != "cuda":
-            d.append("Davi: sem CUDA, o treino usa o modelo base em float32, sem GradScaler e sem autocast fp16 "
+            d.append("Experimento 2: sem CUDA, o treino usa o modelo base em float32, sem GradScaler e sem autocast fp16 "
                      "(no original: base em fp16 com GradScaler); a avaliação usa "
                      + ("fp16 no MPS." if device == "mps" else "float32 na CPU."))
     if "exp3" in run_blocks:
-        d.append("Gustavo: as versões de pacotes do baseline não foram registradas; trl fixado em 1.17.1 e "
+        d.append("Experimento 3: as versões de pacotes do baseline não foram registradas; trl fixado em 1.17.1 e "
                  "juiz qwen3:8b no Ollama, cuja versão não é fixada pelo controlador.")
         if device != "cuda":
-            d.append("Gustavo: sem CUDA não há quantização em 4 bits; o modelo é carregado sem quantizar, em "
+            d.append("Experimento 3: sem CUDA não há quantização em 4 bits; o modelo é carregado sem quantizar, em "
                      "float32, e o DPO roda sem bf16.")
     return d
 

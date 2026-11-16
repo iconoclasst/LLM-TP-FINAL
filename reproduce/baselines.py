@@ -8,7 +8,7 @@ from pathlib import Path
 BASELINE_DIR = Path(__file__).resolve().parent / "baselines"
 FIELDS = ["block", "run", "group", "metric", "value"]
 
-# Rubens/Kayque: subpasta de results/ -> [(chave em meta, métrica)]
+# Experimento 1: subpasta de results/ -> [(chave em meta, métrica)]
 RK_SOURCES = {
     "privacylens": [("acc_logprob", "pl_lp"), ("acc_sampled_mean", "pl_s")],
     "privacylens_semantic": [("acc_semantic", "sem")],

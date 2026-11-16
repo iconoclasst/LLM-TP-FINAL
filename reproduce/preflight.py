@@ -172,7 +172,7 @@ def assess(f: Facts, blocks, smoke: bool = False) -> list[Issue]:
                        "Para reproduzir de fato, use uma máquina com GPU NVIDIA (8 GB de VRAM bastam)."))
         if "exp3" in blocks:
             I.append(Issue("AVISO", "exp3", "sem_4bit",
-                           "Sem CUDA não há quantização em 4 bits (bitsandbytes): o DPO e o ICL do Gustavo carregam o "
+                           "Sem CUDA não há quantização em 4 bits (bitsandbytes): o DPO e o ICL do Experimento 3 carregam o "
                            "modelo sem quantizar. O relatório registra esse desvio."))
         if not f.mps and not smoke:
             I.append(Issue("AVISO", "geral", "tempo", "Só CPU: a execução completa pode levar dias.",
@@ -186,7 +186,7 @@ def assess(f: Facts, blocks, smoke: bool = False) -> list[Issue]:
                        "Se algo falhar, use WSL2 ou Linux."))
     if "exp1" in blocks and f.vulkan is False and not f.llama_server_env:
         I.append(Issue("BLOQUEIO", "exp1", "sem_vulkan",
-                       "O juiz do Rubens/Kayque usa o llama.cpp b11505 com Vulkan, mas libvulkan.so.1 não foi "
+                       "O juiz do Experimento 1 usa o llama.cpp b11505 com Vulkan, mas libvulkan.so.1 não foi "
                        "encontrada. Sem ela, o juiz falharia depois de ~17 h de treino.",
                        "Instale o Vulkan e o ICD da NVIDIA (ex.: `sudo apt install libvulkan1` e o driver NVIDIA "
                        "completo) ou defina LLAMA_SERVER com um llama-server b11505 compilado com CUDA."))
@@ -196,7 +196,7 @@ def assess(f: Facts, blocks, smoke: bool = False) -> list[Issue]:
                    "Ollama por conta própria.")
         if not f.ollama and not f.ollama_running:
             I.append(Issue("BLOQUEIO", "exp3", "sem_ollama",
-                           "O juiz do Gustavo precisa do Ollama, que não está instalado.", install))
+                           "O juiz do Experimento 3 precisa do Ollama, que não está instalado.", install))
         elif not f.ollama_running:
             I.append(Issue("BLOQUEIO", "exp3", "ollama_parado",
                            f"O Ollama está instalado, mas não responde em {OLLAMA_URL}.",

@@ -27,7 +27,7 @@ ausente, só pula aquele bloco; os outros podem rodar se você confirmar.
 presentes e o marcador `outputs/.done/<etapa>.done`, que registra o dispositivo usado. Ao rodar de
 novo no mesmo dispositivo, as etapas concluídas são puladas. Uma etapa interrompida perde as saídas
 parciais e roda do início. As exceções são as etapas longas que retomam sozinhas: o juiz do
-Rubens/Kayque, o DPO e o juiz do Gustavo. Nelas, o que já terminou é mantido.
+Experimento 1, o DPO e o juiz do Experimento 3. Nelas, o que já terminou é mantido.
 
 **Revisões fixadas.** A etapa `insumos_hf` baixa cada modelo e dataset do Hugging Face na revisão de
 `reproduce/pins.toml` e grava essa revisão como `main` no cache. As etapas seguintes rodam com
@@ -38,7 +38,7 @@ marca como `NAO_EXECUTADO` tudo o que não rodou.
 
 ## 2. Blocos
 
-### `exp1`: Rubens/Kayque (Privacy Collapse com LoRA)
+### `exp1`: Privacy Collapse com LoRA
 
 Mesmos comandos do README de `exp1_reproducao_colapso/reproducao_tabela_resultados`, desmembrados em etapas:
 
@@ -57,7 +57,7 @@ seeds 0, 1 e 2.
 
 ### `exp2`: remoção de PII e troca de papéis
 
-Comandos dos notebooks do Davi no Colab (`LLM_privacy_fine_tunings.ipynb` e `privacy_runs_benchmarks.ipynb`, não
+Comandos dos notebooks do Experimento 2 no Colab (`LLM_privacy_fine_tunings.ipynb` e `privacy_runs_benchmarks.ipynb`, não
 versionados, porque só montam o Drive e chamam estes scripts), rodados em `outputs/exp2/`:
 
 | Etapa | Comando | Saída |
@@ -94,11 +94,11 @@ do resultado preliminar.
 | Insumos | SHA-256 dos arquivos do Drive, do PrivacyLens, do GGUF e do llama.cpp | igualdade exata; hash divergente bloqueia o uso |
 | Métricas | cada métrica de cada run contra `reproduce/baselines/` | `|novo − baseline| ≤ max(piso, 2·dp das seeds do baseline)` |
 | Conclusões | afirmações dos relatórios (tabela em `REPRODUCAO.md`) | verdadeiro ou falso |
-| Gustavo | 248 prompts de teste, 995 de treino, 0 de sobreposição com o treino e com os exemplos do ICL, 0 respostas sem veredito | igualdade exata; vazamento reprova até um `--smoke` |
-| Davi | contagens dos `logs.txt` das transformações | igualdade exata |
+| Experimento 3 | 248 prompts de teste, 995 de treino, 0 de sobreposição com o treino e com os exemplos do ICL, 0 respostas sem veredito | igualdade exata; vazamento reprova até um `--smoke` |
+| Experimento 2 | contagens dos `logs.txt` das transformações | igualdade exata |
 
 Pisos, em pontos percentuais: PrivacyLens logprob 10, PrivacyLens amostrado 5, PL semântico 5,
-CIMemories 10, CSQA 2, respostas degradantes (Gustavo) 5. Os pisos se baseiam nos desvios observados
+CIMemories 10, CSQA 2, respostas degradantes (Experimento 3) 5. Os pisos se baseiam nos desvios observados
 entre seeds e no limite de cerca de 10 pontos do CIMemories citado no resumo de resultados.
 
 **Vereditos por métrica:** `OK`, `FORA_DA_TOLERANCIA`, `SEM_BASELINE` e `NAO_EXECUTADO`.
@@ -129,10 +129,10 @@ componentes também é estimado.
 | Situação | Desvio | Onde fica registrado |
 |---|---|---|
 | Sem CUDA (MPS/CPU) | todos os blocos: diferenças numéricas esperadas | `REPRODUCAO.md`, seção Desvios |
-| Sem CUDA, Gustavo | sem quantização em 4 bits (bitsandbytes) e sem bf16; modelo em float32 | idem |
-| Sem CUDA, Davi | treino com o modelo base em float32, sem GradScaler (no original: fp16 + GradScaler) | idem |
-| Davi, sempre | baseline em torch 2.11 no Colab, sem versões fixadas; aqui, torch 2.9.1 do lock | idem |
-| Rubens/Kayque, sempre | seed 0 original em AMD (ROCm), seeds 1–2 em NVIDIA | idem |
+| Sem CUDA, Experimento 3 | sem quantização em 4 bits (bitsandbytes) e sem bf16; modelo em float32 | idem |
+| Sem CUDA, Experimento 2 | treino com o modelo base em float32, sem GradScaler (no original: fp16 + GradScaler) | idem |
+| Experimento 2, sempre | baseline em torch 2.11 no Colab, sem versões fixadas; aqui, torch 2.9.1 do lock | idem |
+| Experimento 1, sempre | seed 0 original em AMD (ROCm), seeds 1–2 em NVIDIA | idem |
 
 Em CUDA, os scripts se comportam exatamente como os originais. As adaptações só entram em ação
 fora da CUDA ou quando as variáveis `REPRO_*` estão definidas.
@@ -142,7 +142,7 @@ fora da CUDA ou quando as variáveis `REPRO_*` estão definidas.
 1. **Veredito geral** no topo.
 2. **Resumo por bloco**: o pior veredito de cada bloco.
 3. **Conclusões**: se cada afirmação dos relatórios continua valendo com os números novos. É o critério mais importante quando os números variam dentro da tolerância.
-4. **Vazamento no Gustavo**: precisa dar 0.
+4. **Vazamento no Experimento 3**: precisa dar 0.
 5. **Desvios e ambiente**: o que foi diferente do original; versões completas em `environment.json`.
 6. **Tabelas por bloco**: novo, baseline, diferença, tolerância e veredito de cada métrica.
 
@@ -163,8 +163,8 @@ fora da CUDA ou quando as variáveis `REPRO_*` estão definidas.
 | Insumo `corrompido` | o arquivo no Drive mudou; não é usado. Avise quem mantém o repositório para atualizar o `manifest.tsv` |
 | Etapa `falhou` | veja o log indicado (`outputs/logs/<bloco>/<etapa>.log`); corrija e rode o mesmo comando para retomar |
 | `BLOQUEIO (exp1) ... libvulkan` (Linux) | o llama.cpp fixado é o build Vulkan: instale `libvulkan1` e o driver NVIDIA completo, ou defina `LLAMA_SERVER` com um llama-server b11505 compilado com CUDA |
-| Etapa `juiz` do Gustavo falhou com "respostas sem veredito" | o Ollama parou ou o modelo não é exatamente `qwen3:8b`; corrija e rode de novo |
-| Falta de memória na GPU | feche outros processos; o juiz do Rubens/Kayque usa ~7 GB de VRAM |
+| Etapa `juiz` do Experimento 3 falhou com "respostas sem veredito" | o Ollama parou ou o modelo não é exatamente `qwen3:8b`; corrija e rode de novo |
+| Falta de memória na GPU | feche outros processos; o juiz do Experimento 1 usa ~7 GB de VRAM |
 | `SSL: CERTIFICATE_VERIFY_FAILED` no Python do macOS | o controlador usa `curl` justamente para evitar isso; se aparecer em pip, rode `Install Certificates.command` da sua instalação do Python |
 
 ## 9. Manutenção

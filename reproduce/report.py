@@ -59,7 +59,7 @@ def _user_prompts(path: Path, key: str) -> list[str]:
 
 
 def gustavo_overlap(out_dir: Path) -> dict | None:
-    """Prompts de teste do Gustavo que aparecem no treino DPO ou nos exemplos do ICL. Precisa dar 0."""
+    """Prompts de teste do Experimento 3 que aparecem no treino DPO ou nos exemplos do ICL. Precisa dar 0."""
     d = Path(out_dir)
     test_p = d / "test.jsonl"
     if not test_p.exists():
@@ -80,7 +80,7 @@ DAVI_EXPECTED = {"role_swap: linhas trocadas": 1729, "pii: linhas mudadas": 1261
 
 
 def davi_counts(data_dir: Path) -> dict | None:
-    """Contagens dos logs das transformações do Davi (igualdade exata com o original)."""
+    """Contagens dos logs das transformações do Experimento 2 (igualdade exata com o original)."""
     import re
     d = Path(data_dir)
     rs = next((p for p in (d / "role_swap" / "v2" / "logs.txt", d / "role_swap" / "logs.txt") if p.exists()), None)
@@ -197,7 +197,7 @@ def render_markdown(rows, claims, overall, env, ledger, deviations, checks=(), b
     L += ["", "## Desvios em relação aos experimentos originais", ""]
     devs = list(deviations)
     if "exp3" in blocks:
-        devs.append("Gustavo: a constante `K = 10` em `exp3_dpo_icl/ICL.py` não é usada; o ICL usa os 3 exemplos "
+        devs.append("Experimento 3: a constante `K = 10` em `exp3_dpo_icl/ICL.py` não é usada; o ICL usa os 3 exemplos "
                     "gravados por `run_all.py` (`K_ICL = 3`), como no resultado preliminar.")
     L += [f"- {d}" for d in devs] or ["Nenhum."]
     L += ["", "## Ambiente", "", "```json", json.dumps(env, indent=2, ensure_ascii=False), "```"]

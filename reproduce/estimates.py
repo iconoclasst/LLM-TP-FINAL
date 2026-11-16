@@ -34,12 +34,12 @@ COMPONENTS = {
     "env_pii": (2.5, "ambiente Presidio/spaCy com en_core_web_lg"),
     "qwen15": (3.1, "Qwen2.5-1.5B-Instruct"),
     "qwen05": (2.0, "Qwen2.5-0.5B e 0.5B-Instruct"),
-    "gguf": (5.0, "Qwen3-8B-Q4_K_M.gguf (juiz do Rubens/Kayque)"),
+    "gguf": (5.0, "Qwen3-8B-Q4_K_M.gguf (juiz do Experimento 1)"),
     "llama_cpp": (0.1, "llama.cpp b11505"),
     "out_rk": (3.5, "33 adapters LoRA e resultados"),
     "out_davi": (0.5, "3 adapters LoRA, datasets gerados e resultados"),
     "out_gustavo": (1.5, "2 adapters DPO com checkpoints e resultados"),
-    "ollama_qwen3": (5.2, "modelo qwen3:8b do Ollama (juiz do Gustavo)"),
+    "ollama_qwen3": (5.2, "modelo qwen3:8b do Ollama (juiz do Experimento 3)"),
 }
 NEEDS = {
     "exp1": ["env_main", "qwen15", "gguf", "llama_cpp", "out_rk"],

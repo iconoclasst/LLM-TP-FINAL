@@ -163,7 +163,7 @@ def ensure_manifest_files(items: list[ManifestItem] | None = None, root: Path = 
     return res
 
 
-# ---------- Gustavo: consultado a cada execução ----------
+# ---------- Experimento 3: consultado a cada execução ----------
 
 GUSTAVO_WANTED = re.compile(
     r"^(test\.jsonl|dpo/dpo_(collapse|control)\.jsonl|icl/shots_(degrading|safe)\.jsonl|"
@@ -173,7 +173,7 @@ GUSTAVO_DIRS = ("out2", "out")   # em ordem de preferência; out_smoke*, out_col
 
 def fetch_gustavo(dest: Path, lister: Callable = list_folder, downloader: Callable = download_file
                   ) -> dict[str, Path]:
-    """Baixa o baseline do Gustavo para `dest` e devolve {caminho relativo: arquivo local}.
+    """Baixa o baseline do Experimento 3 para `dest` e devolve {caminho relativo: arquivo local}.
 
     Sem rede, devolve o que já estiver em `dest`.
     """

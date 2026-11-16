@@ -1,6 +1,6 @@
-"""Roda o run_judge.py do Rubens/Kayque apontando para o llama-server e o GGUF fixados.
+"""Roda o run_judge.py do Experimento 1 apontando para o llama-server e o GGUF fixados.
 
-Roda no ambiente `main`, com cwd na pasta de scripts do Rubens/Kayque. LLAMA_SERVER e JUDGE_GGUF
+Roda no ambiente `main`, com cwd na pasta de scripts do Experimento 1. LLAMA_SERVER e JUDGE_GGUF
 definidos pelo usuário têm prioridade.
 """
 import argparse

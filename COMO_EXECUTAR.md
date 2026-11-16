@@ -9,7 +9,7 @@ critérios de verificação e solução de problemas estão em [`docs/PIPELINE.m
 |---|---|
 | `reproduce.py` | **Ponto de entrada único.** Roda os três experimentos em sequência e compara com os resultados preliminares |
 | `reproduce/` | Código do controlador: verificação do computador, criação dos ambientes, download dos insumos, execução das etapas, comparação e relatório |
-| `reproduce/requirements/` | Dependências com versões fixadas: `main.txt` (ambiente principal), `cuda.txt` (só GPU NVIDIA), `pii.txt` (remoção de PII do Davi) |
+| `reproduce/requirements/` | Dependências com versões fixadas: `main.txt` (ambiente principal), `cuda.txt` (só GPU NVIDIA), `pii.txt` (remoção de PII do Experimento 2) |
 | `reproduce/pins.toml` | Revisões fixadas de modelos e datasets do Hugging Face, build do llama.cpp e hashes |
 | `reproduce/manifest.tsv` | Arquivos baixados do Google Drive (datasets, CIMemories, prompts), com SHA-256 |
 | `reproduce/baselines/` | Métricas dos resultados preliminares em CSV, usadas na comparação |
@@ -50,7 +50,7 @@ python3 reproduce.py --check
 Ele lista os **BLOQUEIOS**, os **AVISOS**, o que será instalado e baixado, o tempo estimado e o
 espaço em disco. Resolva os bloqueios indicados antes de continuar.
 
-**3. Instale o Ollama e o modelo do juiz do Gustavo.** É a única instalação manual:
+**3. Instale o Ollama e o modelo do juiz do Experimento 3.** É a única instalação manual:
 
 ```bash
 # baixe e instale: https://ollama.com/download
@@ -58,7 +58,7 @@ ollama serve            # ou deixe o aplicativo do Ollama aberto
 ollama pull qwen3:8b    # ~5,2 GB
 ```
 
-Sem o Ollama, os blocos do Rubens/Kayque e do Davi rodam normalmente; só o do Gustavo é pulado.
+Sem o Ollama, os blocos do Experimento 1 e do Experimento 2 rodam normalmente; só o do Experimento 3 é pulado.
 
 **4. Faça um teste rápido do pipeline.** Use poucos itens; leva alguns minutos depois dos downloads:
 

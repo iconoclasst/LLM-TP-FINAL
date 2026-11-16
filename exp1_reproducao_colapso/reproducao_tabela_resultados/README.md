@@ -1,4 +1,4 @@
-# Reprodução da Tabela 1 (seção 2 do RESUMO_RESULTADOS.pdf)
+# Reprodução da Tabela 1 (seção 2 do RESUMO_RESULTADOS_EXP1.pdf)
 
 > **Neste repositório, use o controlador único:** `python3 reproduce.py` na raiz (ver o
 > [README principal](../../README.md)). Os dados de entrada e os JSONs de resultado **não** ficam

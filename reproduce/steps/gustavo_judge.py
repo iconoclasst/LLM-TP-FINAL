@@ -1,4 +1,4 @@
-"""Roda o Tester.py do Gustavo e falha se o juiz deixou respostas sem veredito.
+"""Roda o Tester.py do Experimento 3 e falha se o juiz deixou respostas sem veredito.
 
 Antes de rodar, apaga os `judged_*.jsonl` com veredito nulo (por exemplo, Ollama parou no meio),
 para que o Tester.py, que reaproveita julgamentos existentes, julgue de novo só essas condições.

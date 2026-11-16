@@ -15,7 +15,7 @@ BLOCKS = ("exp1", "exp2", "exp3")
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(
         prog="python3 reproduce.py",
-        description="Reproduz os experimentos do TP (Rubens/Kayque, Davi, Gustavo) e compara com os "
+        description="Reproduz os experimentos do TP (Experimentos 1, 2 e 3) e compara com os "
                     "resultados preliminares. Antes de executar, mostra requisitos e empecilhos e pede confirmação.")
     ap.add_argument("--check", action="store_true",
                     help="só verifica ambiente, insumos e disco; mostra o plano e o tempo estimado")
