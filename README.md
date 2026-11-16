@@ -9,7 +9,7 @@ O repositório reúne três trabalhos, todos sobre o Qwen2.5-1.5B-Instruct:
 
 | Pasta | Pergunta | Resultado principal (preliminar) |
 |---|---|---|
-| `exp1_reproducao_colapso/` | O colapso aparece num modelo de 1,5 B treinado com LoRA? E em 6 datasets novos? | PrivacyLens amostrado cai de 92,7% para 45,2% com o `synth_helpful` do artigo, abaixo do controle nas 3 seeds; o dataset novo `msc` causa a segunda maior queda (51,7%) |
+| `exp1_reproducao_colapso/` | O colapso aparece num modelo de 1,5 B treinado com LoRA? E em 6 datasets novos? | PrivacyLens amostrado cai de 92,7% para 45,2% com o `synth_helpful` do artigo, abaixo do controle nas 3 seeds; o dataset novo `msc` causa a segunda maior queda entre os que mantêm o formato de resposta (51,7%) |
 | `exp2_mitigacoes_dataset/` | Remover PII ou trocar papéis no dataset prestativo atenua o colapso? | PrivacyLens amostrado: `degraded` 43,4%, `nopii_ft` 49,4%, `role_swap_ft_v2` 50,0% (seed 0) |
 | `exp3_dpo_icl/` | Otimização de preferência (DPO) ou ICL com respostas degradantes induzem o colapso? | Respostas degradantes: `dpo_collapse` 65,7%, `dpo_control` 0%, ICL ≤ 2,8% (248 prompts, sem vazamento treino/teste) |
 

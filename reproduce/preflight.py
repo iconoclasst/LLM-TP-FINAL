@@ -245,7 +245,7 @@ def render(f: Facts, issues: list[Issue], blocks, smoke: bool) -> str:
         if c == "ollama_qwen3":
             continue
         gb, desc = estimates.COMPONENTS[c]
-        L.append(f"  - {desc}: ~{gb:g} GB".replace(".", ","))
+        L.append(f"  - {desc}: ~{f'{gb:g}'.replace('.', ',')} GB")   # vírgula só no número
     if not (f.python312 or f.conda):
         L.append("  - Python 3.12 via uv (~0,1 GB)")
     if "exp3" in blocks:
